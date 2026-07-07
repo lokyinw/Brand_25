@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>Brand_25</RootNamespace>
+    <AssemblyName>Brand_25</AssemblyName>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Revit 2025 API references. Set Private to false so Revit's own copies are used at runtime. -->
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Brand_25.addin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Fonts\Moogalator.ttf" />
+    <Resource Include="Resources\Fonts\MoogalatorFiller.ttf" />
+    <Resource Include="Resources\Fonts\Reader-Bold-Italic.otf" />
+    <Resource Include="Resources\Fonts\Reader-Bold.otf" />
+    <Resource Include="Resources\Fonts\Reader-Medium-Italic.otf" />
+    <Resource Include="Resources\Fonts\Reader-Medium.otf" />
+    <Resource Include="Resources\Fonts\Reader-Regular-Italic.otf" />
+    <Resource Include="Resources\Fonts\Reader-Regular.otf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Images\close_32.png" />
+    <EmbeddedResource Include="Resources\Images\maximize_32.png" />
+    <EmbeddedResource Include="Resources\Images\minimize_32.png" />
+    <EmbeddedResource Include="Resources\Images\restore_32.png" />
+    <EmbeddedResource Include="Resources\Images\Brand_logo.png" />
+    <EmbeddedResource Include="Resources\Images\B_icon_32.png" />
+    <EmbeddedResource Include="Resources\Images\intelev_32.png" />
+    <EmbeddedResource Include="Resources\Images\hide_markup_32.png" />
+    <EmbeddedResource Include="Resources\Images\unhide_markup_32.png" />
+    <EmbeddedResource Include="Resources\Images\Placeholder_32.png" />
+    <EmbeddedResource Include="Resources\Images\Grid_Propagate_Status_32.png" />
+    <EmbeddedResource Include="Resources\Images\Grid_Toggle_Bubble_32.png" />
+    <EmbeddedResource Include="Resources\Images\Grid_Trim_Extend_32.png" />
+    <EmbeddedResource Include="Resources\Images\Room_Re-center_32.png" />
+    <EmbeddedResource Include="Resources\Images\Wall_Joint_Disallow_32.png" />
+  </ItemGroup>
+
+  <Target Name="CopyToRevitAddinsFolder" AfterTargets="Build">
+    <ItemGroup>
+      <AddinFiles Include="$(OutputPath)*.dll;$(ProjectDir)*.addin" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AddinFiles)" DestinationFolder="$(AppData)\Autodesk\REVIT\Addins\2025" Condition="Exists('$(AppData)\Autodesk\REVIT\Addins\2025')" />
+  </Target>
+
+</Project>

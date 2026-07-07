@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Brand_25</Name>
+    <Assembly>Brand_25.dll</Assembly>
+    <AddInId>
+      EE32E8D3-B2CF-411B-BE6F-CFE67C8D900A
+    </AddInId>
+    <FullClassName>Brand_25.App</FullClassName>
+    <Text>External Application</Text>
+    <Description>Trying things out</Description>
+    <VendorId>Lok</VendorId>
+    <VendorDescription>Lok</VendorDescription>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+  </AddIn>
+</RevitAddIns>
