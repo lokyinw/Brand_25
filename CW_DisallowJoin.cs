@@ -41,7 +41,7 @@ namespace Brand_25
             // Process selected types
             List<ElementId> selectedTypeIds = selector.SelectedWallTypes.Select(wt => wt.Id).ToList();
 
-            using (Transaction tx = new Transaction(doc, "Disallow Wall Joins for Curtain Walls"))
+            using (Transaction tx = new Transaction(doc, "LW_Disallow Wall Joins for Curtain Walls"))
             {
                 tx.Start();
 

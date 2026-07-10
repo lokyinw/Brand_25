@@ -69,7 +69,7 @@ namespace Brand_25
                 Line boundaryLineUB = Line.CreateUnbound(boundaryLine2D.GetEndPoint(0), boundaryLine2D.Direction);
 
                 // Start transaction
-                using (Transaction trans = new Transaction(doc, "Toggle Grid Bubbles"))
+                using (Transaction trans = new Transaction(doc, "LW_Toggle Grid Bubbles"))
                 {
                     trans.Start();
 

@@ -1,17 +1,37 @@
 ﻿using Autodesk.Revit.DB;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq; // Add this at the top of the file with other using directives
+using System.Runtime.CompilerServices;
 
 namespace Brand_25
 {
-    public class VM_Sheet
+    public class VM_Sheet : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public ViewSheet Sheet { get; }
         public string SheetNumber => Sheet.SheetNumber;
         public string SheetName => Sheet.Name;
         public string SheetSeries => GetParameterValue(Sheet, "BA_SheetSeries", "None");
         public string CurrentRevision => GetCurrentRevision(Sheet);
-        public bool IsSelected { get; set; }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
 
         public VM_Sheet(ViewSheet sheet)
         {

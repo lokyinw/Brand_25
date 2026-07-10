@@ -67,7 +67,7 @@ namespace Brand_25
 
         private void PropagateGridStatus(Document doc, View sourceView, List<View> targetViews, string credit)
         {
-            using (Transaction tx = new Transaction(doc, "Propagate Grid Status"))
+            using (Transaction tx = new Transaction(doc, "LW_Propagate Grid Status"))
             {
                 tx.Start();
 

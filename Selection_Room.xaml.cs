@@ -60,8 +60,8 @@ namespace Brand_25
                         roomItem.IsSelected = newValue;
                     }
                 }
-                // Force refresh of checkboxes
-                RoomsDataGrid.Items.Refresh();
+                // VM_Room now raises PropertyChanged, so the DataGrid updates
+                // its checkboxes on its own — no manual Refresh() needed.
             }
         }
 
@@ -88,13 +88,8 @@ namespace Brand_25
             {
                 viewModel.IsSelected = false;
             }
-            RoomsDataGrid.Items.Refresh();
+            // No Refresh() needed — each IsSelected change now notifies the grid directly.
         }
-
-        //private void SelectNone_Click(object sender, RoutedEventArgs e)
-        //{
-        //    RoomsDataGrid.UnselectAll();
-        //}
 
         private BitmapImage LoadEmbeddedImage(string imageName)
         {

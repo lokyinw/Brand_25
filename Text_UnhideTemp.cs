@@ -36,13 +36,15 @@ namespace Brand_25
 
                 if (filters.Count == 0)
                 {
+                    // Nothing hidden — correct the split button icon in case it's out of sync.
+                    App.TextSplitButton.CurrentButton = App.HideMarkupsButton;
                     new Warning("...um...", "You have not hidden any markup for the time being.", credit).ShowDialog();
                     //TaskDialog.Show("Info", "No hidden temp texts or dimensions were found.");
                     return Result.Succeeded;
                 }
 
                 // Process each matching filter
-                using (Transaction trans = new Transaction(doc, "Unhide Temporary Text and Dimensions"))
+                using (Transaction trans = new Transaction(doc, "LW_Unhide Temporary Text and Dimensions"))
                 {
                     trans.Start();
 
@@ -63,6 +65,9 @@ namespace Brand_25
                     }
 
                     trans.Commit();
+
+                    // Markup is now visible again — show "Hide" as the next logical action.
+                    App.TextSplitButton.CurrentButton = App.HideMarkupsButton;
 
                     new Warning("Unhide Markup", $"Markup unhidden. Enjoy the markup.", credit).ShowDialog();
                     //TaskDialog.Show("Success", $"Unhid elements from {filters.Count} filters and removed them from the project.");

@@ -1,10 +1,19 @@
-﻿using Autodesk.Revit.DB;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 
 namespace Brand_25
 {
-    public class VM_Room
+    public class VM_Room : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public Room Room { get; }
         public string Number => GetParameterValue(Room, "Number");
         public string Name => GetParameterValue(Room, "Name");
@@ -12,8 +21,19 @@ namespace Brand_25
         public string DesignOptionName => GetDesignOptionParameterValue(Room);
         public bool IsUnbounded { get; }
         public bool IsUnplaced { get; }
-        public bool IsSelected { get; set; }
         public bool ShouldBeGrayedOut => IsUnbounded || IsUnplaced;
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
 
         public VM_Room(Room room)
         {

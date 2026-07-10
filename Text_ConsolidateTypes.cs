@@ -9,7 +9,7 @@ namespace Brand_25
     [Transaction(TransactionMode.Manual)]
     public class Text_ConsolidateTypes : IExternalCommand
     {
-        private const string credit = "Text_ConsolidateTypes v1.0";
+        private const string credit = "Last Modified by Lok on 2026-03-30. Beta 0.90";
 
         // All attribute display names available for comparison
         private static readonly List<string> AvailableAttributes = new List<string>
@@ -175,7 +175,7 @@ namespace Brand_25
             int reassigned = 0;
             var actualSkipped = new List<string>();
 
-            using (Transaction t = new Transaction(doc, "Consolidate Text Note Types"))
+            using (Transaction t = new Transaction(doc, "LW_Consolidate Text Note Types"))
             {
                 t.Start();
 

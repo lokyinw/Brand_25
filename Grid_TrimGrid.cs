@@ -42,7 +42,7 @@ namespace Brand_25
                 // Get the geometry curve of the detail line
                 Line detailCurve0 = detailLine.GeometryCurve as Line;
                 Line detailCurve = Line.CreateBound(new XYZ(detailCurve0.GetEndPoint(0).X, detailCurve0.GetEndPoint(0).Y, 0), new XYZ(detailCurve0.GetEndPoint(1).X, detailCurve0.GetEndPoint(1).Y, 0));
-                
+
                 // Ask the user to select grid lines using a rectangle
                 new Warning("Trim/Extend Grids", "Which grid do you want to modify?\nRemember, only the 2D extent of this view will be modified.", credit).ShowDialog();
                 List<Grid> gridLines = GetUserSelectedGrids(uiDoc);
@@ -51,9 +51,9 @@ namespace Brand_25
                     new Warning("Oops...", "No grids selected. We have to abort.", credit).ShowDialog();
                     return Result.Failed;
                 }
-                
+
                 // Start a transaction to modify the document
-                using (Transaction trans = new Transaction(doc, "Trim/Extend Grid Lines"))
+                using (Transaction trans = new Transaction(doc, "LW_Trim/Extend Grid Lines"))
                 {
                     trans.Start();
 
@@ -74,7 +74,7 @@ namespace Brand_25
                         // Check if the grid line intersects with the detail line
                         IntersectionResultArray intersectionResults;
                         SetComparisonResult result = gridCurveUB.Intersect(detailCurve, out intersectionResults);
-                        
+
                         if (result == SetComparisonResult.Overlap)
                         {
                             // Trim or extend the grid line
@@ -131,7 +131,7 @@ namespace Brand_25
                 // Extend scenario: end points are on the same side of the detail line
                 double distanceStart = detailCurve.Distance(gridStart);
                 double distanceEnd = detailCurve.Distance(gridEnd);
-                
+
                 if (distanceStart > distanceEnd)
                 {
                     // Extend from the start point

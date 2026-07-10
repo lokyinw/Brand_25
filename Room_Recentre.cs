@@ -78,7 +78,7 @@ namespace Brand_25
                 int skippedCenterOutsideRoom = 0;
                 int roomsUsingLIC = 0;
 
-                using (Transaction trans = new Transaction(doc, "Move Rooms to Center"))
+                using (Transaction trans = new Transaction(doc, "LW_Move Rooms to Center"))
                 {
                     trans.Start();
 

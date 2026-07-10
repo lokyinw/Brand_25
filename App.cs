@@ -11,6 +11,12 @@ namespace Brand_25
 {
     public class App : IExternalApplication
     {
+        // Exposed so Text_HideTemp / Text_UnhideTemp can flip which icon
+        // is shown on the split button after they run.
+        public static SplitButton TextSplitButton { get; private set; }
+        public static PushButton HideMarkupsButton { get; private set; }
+        public static PushButton UnhideMarkupsButton { get; private set; }
+
         public Result OnShutdown(UIControlledApplication application)
         {
             return Result.Succeeded;
@@ -79,8 +85,19 @@ namespace Brand_25
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
-            sb.AddPushButton(btnData4a);
-            sb.AddPushButton(btnData4b);
+            PushButton pbHide = sb.AddPushButton(btnData4a);
+            PushButton pbUnhide = sb.AddPushButton(btnData4b);
+
+            // CurrentButton can only be set while IsSynchronizedWithCurrentItem stays true
+            // (Revit throws InvalidOperationException otherwise). Leaving it at its default
+            // (true) still lets us override the icon manually after each command runs —
+            // our assignment in Text_HideTemp/Text_UnhideTemp happens after Revit's own
+            // auto-sync-on-click, so it takes precedence.
+            sb.CurrentButton = pbHide; // nothing hidden yet at startup
+
+            TextSplitButton = sb;
+            HideMarkupsButton = pbHide;
+            UnhideMarkupsButton = pbUnhide;
 
 
             //RibbonPanel panelP = application.CreateRibbonPanel(tabName, "Placeholder");
@@ -98,7 +115,7 @@ namespace Brand_25
 
             //panel1.AddSeparator();
             //panel1.AddStackedItems(btnData2a, btnData3a);
-            
+
 
             return Result.Succeeded;
         }

@@ -31,6 +31,8 @@ namespace Brand_25
 
                 if (existingFilters.Count > 0)
                 {
+                    // Markup is already hidden — correct the split button icon in case it's out of sync.
+                    App.TextSplitButton.CurrentButton = App.UnhideMarkupsButton;
                     new Warning("Oops...", "...seems you are hiding something.", credit).ShowDialog();
                     return Result.Cancelled;
                 }
@@ -104,6 +106,9 @@ namespace Brand_25
 
                 // Create and apply filter
                 CreateAndApplyFilter(doc, viewsToProcess, elementsToHide, filterNamePattern, credit);
+
+                // Markup is now hidden — show "Unhide" as the next logical action.
+                App.TextSplitButton.CurrentButton = App.UnhideMarkupsButton;
 
                 return Result.Succeeded;
             }
@@ -179,7 +184,7 @@ namespace Brand_25
 
         private void CreateAndApplyFilter(Document doc, List<View> viewsToProcess, List<ElementId> elementsToHide, string filterNamePattern, string credit)
         {
-            using (Transaction trans = new Transaction(doc, "Hide Temporary Text and Dimensions"))
+            using (Transaction trans = new Transaction(doc, "LW_Hide Temporary Text and Dimensions"))
             {
                 trans.Start();
 
