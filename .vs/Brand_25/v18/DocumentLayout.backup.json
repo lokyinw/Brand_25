@@ -3,44 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\text_unhidetemp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:text_unhidetemp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\text_hidetemp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:text_hidetemp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\text_consolidatetypes.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:text_consolidatetypes.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_recentre.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_recentre.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\grid_trimgrid.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:grid_trimgrid.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\grid_propagatestatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:grid_propagatestatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\grid_bubbletoggle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:grid_bubbletoggle.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\cw_disallowjoin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:cw_disallowjoin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_recentre.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_recentre.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -50,136 +18,32 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 7,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "Text_ConsolidateTypes.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_ConsolidateTypes.cs",
-              "RelativeDocumentMoniker": "Text_ConsolidateTypes.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_ConsolidateTypes.cs",
-              "RelativeToolTip": "Text_ConsolidateTypes.cs",
-              "ViewState": "AgIAAPIAAAAAAAAAAAAowBgBAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:35:37.472Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "Room_Recentre.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_Recentre.cs",
-              "RelativeDocumentMoniker": "Room_Recentre.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_Recentre.cs",
-              "RelativeToolTip": "Room_Recentre.cs",
-              "ViewState": "AgIAALUAAAAAAAAAAAAowNsAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:35:18.354Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 0,
               "Title": "Room_CreateIntElev.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
               "RelativeDocumentMoniker": "Room_CreateIntElev.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
-              "RelativeToolTip": "Room_CreateIntElev.cs",
-              "ViewState": "AgIAABICAAAAAAAAAAAowDgCAAABAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs*",
+              "RelativeToolTip": "Room_CreateIntElev.cs*",
+              "ViewState": "AgIAAFcCAAAAAAAAAAAmwG0CAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:35:04.755Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "Grid_TrimGrid.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_TrimGrid.cs",
-              "RelativeDocumentMoniker": "Grid_TrimGrid.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_TrimGrid.cs",
-              "RelativeToolTip": "Grid_TrimGrid.cs",
-              "ViewState": "AgIAAKYAAAAAAAAAAAAowMwAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:34:38.048Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "Grid_PropagateStatus.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_PropagateStatus.cs",
-              "RelativeDocumentMoniker": "Grid_PropagateStatus.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_PropagateStatus.cs",
-              "RelativeToolTip": "Grid_PropagateStatus.cs",
-              "ViewState": "AgIAAFMAAAAAAAAAAAAowHkAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:34:16.45Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "CW_DisallowJoin.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\CW_DisallowJoin.cs",
-              "RelativeDocumentMoniker": "CW_DisallowJoin.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\CW_DisallowJoin.cs",
-              "RelativeToolTip": "CW_DisallowJoin.cs",
-              "ViewState": "AgIAACIAAAAAAAAAAAAowEgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:33:30.386Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "Grid_BubbleToggle.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_BubbleToggle.cs",
-              "RelativeDocumentMoniker": "Grid_BubbleToggle.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Grid_BubbleToggle.cs",
-              "RelativeToolTip": "Grid_BubbleToggle.cs",
-              "ViewState": "AgIAAKgAAAAAAAAAAAAowM4AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:27:47.254Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "Text_UnhideTemp.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_UnhideTemp.cs",
-              "RelativeDocumentMoniker": "Text_UnhideTemp.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_UnhideTemp.cs",
-              "RelativeToolTip": "Text_UnhideTemp.cs",
-              "ViewState": "AgIAAEgAAAAAAAAAAAAowG4AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:21:12.76Z",
+              "WhenOpened": "2026-07-10T07:29:52.462Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "Text_HideTemp.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_HideTemp.cs",
-              "RelativeDocumentMoniker": "Text_HideTemp.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_HideTemp.cs",
-              "RelativeToolTip": "Text_HideTemp.cs",
-              "ViewState": "AgIAALYAAAAAAAAAAAAowNwAAAABAAAAAAAAAA==",
+              "Title": "Room_Recentre.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_Recentre.cs",
+              "RelativeDocumentMoniker": "Room_Recentre.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_Recentre.cs",
+              "RelativeToolTip": "Room_Recentre.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAP8AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:20:47.894Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "App.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeDocumentMoniker": "App.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeToolTip": "App.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIoAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-10T06:17:37.247Z",
+              "WhenOpened": "2026-07-10T06:35:18.354Z",
               "EditorCaption": ""
             }
           ]

@@ -11,6 +11,7 @@ using System.Text;
 namespace Brand_25
 {
     [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
     public class Room_CreateIntElev : IExternalCommand
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
@@ -95,28 +96,75 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                // Step 6: Create internal elevations for selected rooms
-                using (Transaction trans = new Transaction(doc, "LW_Create Internal Elevations"))
+                // Step 5.5: Build a lookup of (Level, Phase) -> matching floor plan view ONCE,
+                // instead of re-querying every ViewPlan in the document for every room.
+                Dictionary<(ElementId levelId, ElementId phaseId), ViewPlan> viewLookup =
+                    new FilteredElementCollector(doc)
+                        .OfClass(typeof(ViewPlan))
+                        .Cast<ViewPlan>()
+                        .Where(v => v.ViewType == ViewType.FloorPlan && !v.IsTemplate && v.GenLevel != null
+                                    && v.get_Parameter(BuiltInParameter.VIEW_PHASE) != null)
+                        .GroupBy(v => (v.GenLevel.Id, v.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId()))
+                        .ToDictionary(g => g.Key, g => g.First());
+
+                // Step 6: Create internal elevations for selected rooms.
+                // Rooms are processed in batches, each in its own Transaction, instead of
+                // one giant Transaction for the whole selection. A single long-running
+                // transaction accumulates pending-change bookkeeping that made each later
+                // room noticeably slower than the first (confirmed by profiling). Committing
+                // periodically resets that cost. The TransactionGroup + Assimilate() keeps
+                // all of it as a single "LW_Create Internal Elevations" entry in Revit's
+                // Undo list, so the batching is invisible to the user.
+                const int roomsPerBatch = 5;
+
+                int totalElevationsCreated = 0;
+                List<string> issues = new List<string>();
+
+                using (TransactionGroup transGroup = new TransactionGroup(doc, "LW_Create Internal Elevations"))
                 {
-                    trans.Start();
+                    transGroup.Start();
 
-                    int totalElevationsCreated = 0; // Renamed variable
-                    foreach (Room room in roomWindow.SelectedRooms)
+                    List<Room> selectedRooms = roomWindow.SelectedRooms.ToList();
+                    for (int batchStart = 0; batchStart < selectedRooms.Count; batchStart += roomsPerBatch)
                     {
-                        log.AppendLine($"Processing Room: {room.Name} (ID: {room.Id})");
+                        List<Room> batch = selectedRooms.Skip(batchStart).Take(roomsPerBatch).ToList();
 
-                        int elevationsCreated = CreateElevationsForRoom(doc, room, selectedElevType, log);
-                        totalElevationsCreated += elevationsCreated;
+                        using (Transaction trans = new Transaction(doc, "LW_Create Internal Elevations"))
+                        {
+                            trans.Start();
 
-                        log.AppendLine($"Created {elevationsCreated} elevations for Room: {room.Name} (ID: {room.Id})");
-                        log.AppendLine();
+                            foreach (Room room in batch)
+                            {
+                                log.AppendLine($"Processing Room: {room.Name} (ID: {room.Id})");
+
+                                int elevationsCreated = CreateElevationsForRoom(doc, room, selectedElevType, viewLookup, log, issues);
+                                totalElevationsCreated += elevationsCreated;
+
+                                log.AppendLine($"Created {elevationsCreated} elevations for Room: {room.Name} (ID: {room.Id})");
+                                log.AppendLine();
+                            }
+
+                            trans.Commit();
+                        }
                     }
 
-                    trans.Commit();
+                    transGroup.Assimilate();
+                }
 
-                    // Show success message
-                    new Warning("Success", $"{totalElevationsCreated} internal elevations created.", credit).ShowDialog();
-                    log.AppendLine($"{totalElevationsCreated} internal elevations created.");
+                // Show success message, plus a count of any issues instead of
+                // having popped up a blocking dialog for each one mid-loop.
+                string summary = $"{totalElevationsCreated} internal elevations created.";
+                if (issues.Count > 0)
+                {
+                    summary += $"\n\n{issues.Count} issue(s) were encountered — see the log for details.";
+                }
+                new Warning("Success", summary, credit).ShowDialog();
+                log.AppendLine($"{totalElevationsCreated} internal elevations created.");
+                if (issues.Count > 0)
+                {
+                    log.AppendLine();
+                    log.AppendLine($"=== {issues.Count} Issue(s) ===");
+                    foreach (string issue in issues) log.AppendLine(issue);
                 }
 
                 // Save the log to a text file
@@ -141,16 +189,19 @@ namespace Brand_25
             }
         }
 
-        private int CreateElevationsForRoom(Document doc, Room room, ViewFamilyType elevationType, StringBuilder log)
+        private int CreateElevationsForRoom(Document doc, Room room, ViewFamilyType elevationType,
+            Dictionary<(ElementId levelId, ElementId phaseId), ViewPlan> viewLookup, StringBuilder log, List<string> issues)
         {
             int createdElevations = 0;
 
-            // Step 1: Find matching plan view for the room
-            ViewPlan matchingView = FindMatchingView(doc, room, log);
+            // Step 1: Find matching plan view for the room (O(1) dictionary lookup instead
+            // of a fresh document-wide FilteredElementCollector query per room).
+            ViewPlan matchingView = FindMatchingView(doc, room, viewLookup, log);
             if (matchingView == null)
             {
-                log.AppendLine("Error: No matching plan view found for the room.");
-                TaskDialog.Show("Error", "No matching plan view found for the room.");
+                string issue = $"Room {room.Name} (ID: {room.Id}): No matching plan view found for the room.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
                 return 0;
             }
 
@@ -158,8 +209,9 @@ namespace Brand_25
             IList<IList<BoundarySegment>> boundarySegments = room.GetBoundarySegments(new SpatialElementBoundaryOptions());
             if (boundarySegments == null || boundarySegments.Count == 0)
             {
-                log.AppendLine("Error: No boundary segments found for the room.");
-                TaskDialog.Show("Error", "No boundary segments found for the room.");
+                string issue = $"Room {room.Name} (ID: {room.Id}): No boundary segments found for the room.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
                 return 0;
             }
 
@@ -173,8 +225,9 @@ namespace Brand_25
 
             if (filteredBoundarySegments.Count == 0)
             {
-                log.AppendLine("Error: No valid boundary segments (non-arc) found for the room.");
-                TaskDialog.Show("Error", "No valid boundary segments (non-arc) found for the room.");
+                string issue = $"Room {room.Name} (ID: {room.Id}): No valid boundary segments (non-arc) found for the room.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
                 return 0;
             }
 
@@ -193,16 +246,18 @@ namespace Brand_25
             LocationPoint location = room.Location as LocationPoint;
             if (location == null)
             {
-                log.AppendLine("Error: Room does not have a valid location point.");
-                TaskDialog.Show("Error", "Room does not have a valid location point.");
+                string issue = $"Room {room.Name} (ID: {room.Id}): Room does not have a valid location point.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
                 return 0;
             }
 
             Level roomLevel = doc.GetElement(room.LevelId) as Level;
             if (roomLevel == null)
             {
-                log.AppendLine("Error: Room does not have a valid level.");
-                TaskDialog.Show("Error", "Room does not have a valid level.");
+                string issue = $"Room {room.Name} (ID: {room.Id}): Room does not have a valid level.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
                 return 0;
             }
 
@@ -210,7 +265,7 @@ namespace Brand_25
             log.AppendLine($"Room Center: {roomCenter}");
 
             // Step 4: Group walls by orthogonal directions
-            List<List<XYZ>> wallGroups = GroupWallsByOrthogonalDirections(filteredBoundarySegments.Cast<IList<BoundarySegment>>().ToList(), roomCenter, log);
+            List<List<XYZ>> wallGroups = GroupWallsByOrthogonalDirections(filteredBoundarySegments.Cast<IList<BoundarySegment>>().ToList(), roomCenter, log, issues);
 
             // Step 5: Create elevation markers for each group
             double markerOffsetDistance = 3.0; // Offset distance in meters
@@ -224,8 +279,9 @@ namespace Brand_25
                 // Ensure the group has at most 4 directions
                 if (group.Count > 4)
                 {
-                    log.AppendLine("Error: A group has more than 4 directions. This is not supported.");
-                    TaskDialog.Show("Error", "A group has more than 4 directions. This is not supported.");
+                    string issue = $"Room {room.Name} (ID: {room.Id}): A wall group has more than 4 directions, which is not supported.";
+                    log.AppendLine($"Error: {issue}");
+                    issues.Add(issue);
                     continue;
                 }
 
@@ -233,19 +289,25 @@ namespace Brand_25
                 ElevationMarker marker = ElevationMarker.CreateElevationMarker(doc, elevationType.Id, roomCenter, 50);
                 if (marker == null)
                 {
-                    log.AppendLine("Error: Failed to create elevation marker.");
-                    TaskDialog.Show("Error", "Failed to create elevation marker.");
+                    string issue = $"Room {room.Name} (ID: {room.Id}): Failed to create elevation marker.";
+                    log.AppendLine($"Error: {issue}");
+                    issues.Add(issue);
                     continue;
                 }
 
                 log.AppendLine($"Created Elevation Marker: {marker.Id}");
 
-                // Step 6: Create a dummy elevation at index 0
+                // Step 6: Create a placeholder elevation at index 2 BEFORE rotating.
+                // A brand-new ElevationMarker apparently needs to already host at least
+                // one view for a subsequent rotation to actually take effect on views
+                // created afterward — rotating an empty marker doesn't stick. This view
+                // gets replaced with a correctly-oriented one once we've rotated.
                 ViewSection dummyElevation = marker.CreateElevation(doc, matchingView.Id, 2);
                 if (dummyElevation == null)
                 {
-                    log.AppendLine("Error: Failed to create dummy elevation.");
-                    TaskDialog.Show("Error", "Failed to create dummy elevation.");
+                    string issue = $"Room {room.Name} (ID: {room.Id}): Failed to create dummy elevation.";
+                    log.AppendLine($"Error: {issue}");
+                    issues.Add(issue);
                     continue;
                 }
                 log.AppendLine($"Created Dummy Elevation: {dummyElevation.Name} (ID: {dummyElevation.Id})");
@@ -255,95 +317,93 @@ namespace Brand_25
                 RotateMarker(doc, marker, firstWallDirection, roomCenter, log);
                 log.AppendLine($"Rotated Marker {marker.Id} to align with wall direction: {firstWallDirection}");
 
-                // Query and log the ViewDirection of the dummy elevation
-                XYZ dummyElevationViewDirection = dummyElevation.ViewDirection;
-                log.AppendLine($"Dummy Elevation ViewDirection: {dummyElevationViewDirection}");
+                // With RegenerationOption.Manual, the rotation above isn't reflected in the
+                // model's geometry until we regenerate explicitly. Every CreateElevation call
+                // below depends on the marker's rotated orientation.
+                doc.Regenerate();
 
-                // Step 8: Create elevations for each wall in the group, except the firstWallDirection
+                // Step 8: Create elevations for every OTHER wall direction in the group first
+                // (firstWallDirection/index 2 is still occupied by the pre-rotation dummy for now).
+                // Creating these first means that, when it's time to delete the stale dummy,
+                // the marker already has at least one correctly-oriented view hosted — so the
+                // marker is never left with zero views mid-transaction, and we only need a
+                // second temporary dummy for the one edge case where the group has no "other"
+                // directions at all.
                 int createdElevationsInGroup = 0;
-                for (int i = 0; i < group.Count; i++)
+                foreach (XYZ wallDirection in group.Skip(1))
                 {
-                    if (i == 0) continue; // Skip the first wall direction (already handled by the dummy elevation)
-
-                    XYZ wallDirection = group[i];
                     int elevationIndex = GetElevationIndex(wallDirection, firstWallDirection, log);
                     log.AppendLine($"Creating elevation for wall direction: {wallDirection} (Index: {elevationIndex})");
 
                     try
                     {
-                        // Create the elevation view
                         ViewSection elevationView = marker.CreateElevation(doc, matchingView.Id, elevationIndex);
                         if (elevationView != null)
                         {
                             createdElevationsInGroup++;
                             createdElevations++; // Increment the total counter
 
-                            // Rename the elevation view
-                            RenameElevation(elevationView, room, elevationNumber);
+                            RenameElevation(elevationView, room, elevationNumber, issues);
                             log.AppendLine($"Created Elevation View: {elevationView.Name} (ID: {elevationView.Id}) towards {elevationView.ViewDirection}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        log.AppendLine($"Error creating elevation for index {elevationIndex}: {ex.Message}");
-                        TaskDialog.Show("Error", $"Failed to create elevation for index {elevationIndex}: {ex.Message}");
+                        string issue = $"Room {room.Name} (ID: {room.Id}): Failed to create elevation for index {elevationIndex}: {ex.Message}";
+                        log.AppendLine($"Error: {issue}");
+                        issues.Add(issue);
                     }
                     finally
                     {
-                        // Increment the elevation number regardless of success or failure
                         elevationNumber++;
                     }
                 }
 
-                // Step 9: Handle the dummy elevation based on the number of elevations created
+                // Step 9: Replace the pre-rotation dummy at index 2 with the real,
+                // correctly-oriented view for firstWallDirection.
                 if (createdElevationsInGroup > 0)
                 {
-                    // Multiple elevations in this group: Delete the dummy elevation and re-create the real elevation at index 0
-                    Element dummy = dummyElevation as Element;
-                    doc.Delete(dummy.Id);
-                    //log.AppendLine($"Deleted Dummy Elevation: {dummyElevation.Name} (ID: {dummyElevation.Id})");
+                    // At least one other view already exists on the marker, so it's safe
+                    // to delete the dummy and recreate index 2 directly.
+                    doc.Delete(dummyElevation.Id);
 
-                    // Re-create the real elevation at index 2
                     ViewSection realElevation = marker.CreateElevation(doc, matchingView.Id, 2);
                     if (realElevation != null)
                     {
                         createdElevations++; // Increment the total counter
-                        RenameElevation(realElevation, room, elevationNumber);
-                        log.AppendLine($"Created Real Elevation at Index 0: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
+                        RenameElevation(realElevation, room, elevationNumber, issues);
+                        log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
                 }
                 else
                 {
-                    // Only one elevation in this group: Create another dummy elevation at index 1
+                    // No other directions in this group — deleting the dummy right now
+                    // would leave the marker with zero hosted views. Create a second,
+                    // temporary dummy at a different index first to keep the marker
+                    // "alive" through the swap, then clean it up afterward.
                     ViewSection dummyElevation2 = marker.CreateElevation(doc, matchingView.Id, 1);
                     if (dummyElevation2 == null)
                     {
-                        log.AppendLine("Error: Failed to create second dummy elevation.");
-                        TaskDialog.Show("Error", "Failed to create second dummy elevation.");
+                        string issue = $"Room {room.Name} (ID: {room.Id}): Failed to create second dummy elevation.";
+                        log.AppendLine($"Error: {issue}");
+                        issues.Add(issue);
                         continue;
                     }
                     log.AppendLine($"Created Second Dummy Elevation: {dummyElevation2.Name} (ID: {dummyElevation2.Id})");
 
-                    // Delete the dummy elevation at index 2
-                    Element dummy0 = dummyElevation as Element;
-                    doc.Delete(dummy0.Id);
-                    //log.AppendLine($"Deleted Dummy Elevation: {dummyElevation.Name} (ID: {dummyElevation.Id})");
+                    doc.Delete(dummyElevation.Id);
 
-                    // Re-create the real elevation at index 2
                     ViewSection realElevation = marker.CreateElevation(doc, matchingView.Id, 2);
                     if (realElevation != null)
                     {
                         createdElevations++; // Increment the total counter
-                        RenameElevation(realElevation, room, elevationNumber);
-                        log.AppendLine($"Created Real Elevation at Index 0: {realElevation.Name} (ID: {realElevation.Id})");
+                        RenameElevation(realElevation, room, elevationNumber, issues);
+                        log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
 
-                    // Delete the second dummy elevation at index 1
-                    Element dummy1 = dummyElevation2 as Element;
-                    doc.Delete(dummy1.Id);
-                    //log.AppendLine($"Deleted Second Dummy Elevation: {dummyElevation2.Name} (ID: {dummyElevation2.Id})");
+                    doc.Delete(dummyElevation2.Id);
                 }
 
                 // Step 10: Move secondary markers by 1 meter in the index 0 direction
@@ -444,7 +504,7 @@ namespace Brand_25
             }
         }
 
-        private List<List<XYZ>> GroupWallsByOrthogonalDirections(IList<IList<BoundarySegment>> boundarySegments, XYZ roomCenter, StringBuilder log)
+        private List<List<XYZ>> GroupWallsByOrthogonalDirections(IList<IList<BoundarySegment>> boundarySegments, XYZ roomCenter, StringBuilder log, List<string> issues)
         {
             List<XYZ> wallDirections = new List<XYZ>();
             foreach (IList<BoundarySegment> segmentList in boundarySegments)
@@ -493,8 +553,9 @@ namespace Brand_25
                 // Ensure the group has at most 4 directions
                 if (group.Count > 4)
                 {
-                    log.AppendLine("Error: A group has more than 4 directions. This is not supported.");
-                    TaskDialog.Show("Error", "A group has more than 4 directions. This is not supported.");
+                    string issue = "A wall group has more than 4 directions, which is not supported.";
+                    log.AppendLine($"Error: {issue}");
+                    issues.Add(issue);
                     continue;
                 }
 
@@ -510,7 +571,7 @@ namespace Brand_25
             return Math.Abs(dotProduct) < 1e-6 || Math.Abs(dotProduct + 1) < 1e-6; // Check if vectors are orthogonal or 180°
         }
 
-        private void RenameElevation(ViewSection elevationView, Room room, int elevationNumber)
+        private void RenameElevation(ViewSection elevationView, Room room, int elevationNumber, List<string> issues)
         {
             string newName = $"{room.Number} {room.Name} - {elevationNumber}";
             try
@@ -520,12 +581,12 @@ namespace Brand_25
             catch (Exception ex)
             {
                 // Handle naming conflicts (e.g., duplicate names)
-                TaskDialog.Show("Warning", $"Failed to rename elevation view: {ex.Message}\n{room.Number} {room.Name} - {elevationNumber}");
+                issues.Add($"Failed to rename elevation view to \"{newName}\": {ex.Message}");
             }
         }
 
 
-        private ViewPlan FindMatchingView(Document doc, Room room, StringBuilder log)
+        private ViewPlan FindMatchingView(Document doc, Room room, Dictionary<(ElementId levelId, ElementId phaseId), ViewPlan> viewLookup, StringBuilder log)
         {
             ElementId phaseId = room.get_Parameter(BuiltInParameter.ROOM_PHASE).AsElementId();
             Phase roomPhase = doc.GetElement(phaseId) as Phase;
@@ -542,17 +603,9 @@ namespace Brand_25
                 return null;
             }
 
-            // Find the matching view
-            ViewPlan matchingView = new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewPlan))
-                .Cast<ViewPlan>()
-                .Where(v =>
-                    v.ViewType == ViewType.FloorPlan &&
-                    !v.IsTemplate &&
-                    v.GenLevel != null &&
-                    v.GenLevel.Id == roomLevel.Id &&
-                    v.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId() == phaseId)
-                .FirstOrDefault();
+            // Find the matching view via the pre-built lookup (O(1)) instead of
+            // re-scanning every ViewPlan in the document for each room.
+            viewLookup.TryGetValue((roomLevel.Id, phaseId), out ViewPlan matchingView);
 
             if (matchingView != null)
             {
