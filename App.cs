@@ -83,6 +83,14 @@ namespace Brand_25
             btnData5a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
             panel5.AddItem(btnData5a);
 
+            // Control-test panel: standalone, unrelated to the main workflow. Remove once
+            // the GetCropShape/SetCropShape investigation is finished.
+            RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
+            PushButtonData btnDataTestCrop = new PushButtonData("btnTestCrop", "Test Crop\nShape Adjust", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_TestCropShapeAdjust");
+            btnDataTestCrop.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnDataTestCrop.ToolTip = "CONTROL TEST: lowers the active elevation/section view's crop shape top by 2 feet via GetCropShape/SetCropShape, done as a standalone action on an already-existing view. Reports success or the exact exception.";
+            panelTest.AddItem(btnDataTestCrop);
+
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
             PushButton pbHide = sb.AddPushButton(btnData4a);

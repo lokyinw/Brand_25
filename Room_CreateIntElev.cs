@@ -120,9 +120,42 @@ namespace Brand_25
                 int totalElevationsCreated = 0;
                 List<string> issues = new List<string>();
 
+                // Views queued for crop-shape adjustment, done as a SEPARATE pass after
+                // all elevations exist and their creating transactions have committed.
+                // A control test confirmed GetCropShape -> modify -> SetCropShape works
+                // fine on an already-existing, already-regenerated view — the repeated
+                // failures earlier were from doing this immediately inside the same
+                // transaction as the view's own creation, not from the geometry itself.
+                List<(ViewSection view, double topZ, double floorZ)> cropAdjustQueue =
+                    new List<(ViewSection, double, double)>();
+
                 using (TransactionGroup transGroup = new TransactionGroup(doc, "LW_Create Internal Elevations"))
                 {
                     transGroup.Start();
+
+                    // Room bounding boxes only reflect a room's real 3D extent (capped by
+                    // whatever ceiling/roof/floor bounds it above) when Volume Computations
+                    // is turned on. Snapshot the current setting, force it on for this
+                    // command's duration, and restore it afterward so we don't leave a
+                    // side effect on the project.
+                    AreaVolumeSettings areaVolumeSettings = AreaVolumeSettings.GetAreaVolumeSettings(doc);
+                    bool originalComputeVolumes = areaVolumeSettings.ComputeVolumes;
+                    log.AppendLine($"Volume Computations was originally: {(originalComputeVolumes ? "ON" : "OFF")}");
+
+                    if (!originalComputeVolumes)
+                    {
+                        using (Transaction volTrans = new Transaction(doc, "LW_Enable Volume Computations"))
+                        {
+                            volTrans.Start();
+                            areaVolumeSettings.ComputeVolumes = true;
+                            volTrans.Commit();
+                        }
+                        // Belt-and-suspenders: Transaction.Commit() already forces a full
+                        // regeneration, but this guarantees room bounding boxes are current
+                        // before we start reading them below.
+                        doc.Regenerate();
+                        log.AppendLine("Volume Computations temporarily enabled.");
+                    }
 
                     List<Room> selectedRooms = roomWindow.SelectedRooms.ToList();
                     for (int batchStart = 0; batchStart < selectedRooms.Count; batchStart += roomsPerBatch)
@@ -137,13 +170,48 @@ namespace Brand_25
                             {
                                 log.AppendLine($"Processing Room: {room.Name} (ID: {room.Id})");
 
-                                int elevationsCreated = CreateElevationsForRoom(doc, room, selectedElevType, viewLookup, log, issues);
+                                int elevationsCreated = CreateElevationsForRoom(doc, room, selectedElevType, viewLookup, log, issues, cropAdjustQueue);
                                 totalElevationsCreated += elevationsCreated;
 
                                 log.AppendLine($"Created {elevationsCreated} elevations for Room: {room.Name} (ID: {room.Id})");
                                 log.AppendLine();
                             }
 
+                            trans.Commit();
+                        }
+                    }
+
+                    // Restore Volume Computations to whatever it was before this command ran.
+                    if (!originalComputeVolumes)
+                    {
+                        using (Transaction volRevertTrans = new Transaction(doc, "LW_Restore Volume Computations"))
+                        {
+                            volRevertTrans.Start();
+                            areaVolumeSettings.ComputeVolumes = originalComputeVolumes;
+                            volRevertTrans.Commit();
+                        }
+                        doc.Regenerate();
+                        log.AppendLine($"Volume Computations restored to: {(originalComputeVolumes ? "ON" : "OFF")}");
+                    }
+
+                    // Second pass: adjust crop shapes now that every elevation view in the
+                    // queue already exists and its creating transaction has committed.
+                    // Batched the same way as room processing, for the same reason (avoid
+                    // one giant transaction's cumulative slowdown).
+                    const int viewsPerBatch = 20; // lighter-weight than element creation, so a larger batch is fine
+                    log.AppendLine();
+                    log.AppendLine($"=== Adjusting crop shapes for {cropAdjustQueue.Count} view(s) ===");
+                    for (int batchStart = 0; batchStart < cropAdjustQueue.Count; batchStart += viewsPerBatch)
+                    {
+                        var batch = cropAdjustQueue.Skip(batchStart).Take(viewsPerBatch).ToList();
+
+                        using (Transaction trans = new Transaction(doc, "LW_Adjust Elevation Crop"))
+                        {
+                            trans.Start();
+                            foreach (var (view, topZ, floorZ) in batch)
+                            {
+                                SetElevationCropShape(view, topZ, floorZ, log);
+                            }
                             trans.Commit();
                         }
                     }
@@ -190,7 +258,8 @@ namespace Brand_25
         }
 
         private int CreateElevationsForRoom(Document doc, Room room, ViewFamilyType elevationType,
-            Dictionary<(ElementId levelId, ElementId phaseId), ViewPlan> viewLookup, StringBuilder log, List<string> issues)
+            Dictionary<(ElementId levelId, ElementId phaseId), ViewPlan> viewLookup, StringBuilder log, List<string> issues,
+            List<(ViewSection view, double topZ, double floorZ)> cropAdjustQueue)
         {
             int createdElevations = 0;
 
@@ -263,6 +332,28 @@ namespace Brand_25
 
             XYZ roomCenter = new XYZ(location.Point.X, location.Point.Y, roomLevel.Elevation);
             log.AppendLine($"Room Center: {roomCenter}");
+
+            // With Volume Computations on, the room's bounding box top reflects its real
+            // 3D extent — capped by whatever ceiling/roof/floor actually bounds it above —
+            // rather than just the room's Upper Limit + Offset parameters. This is what
+            // we align each elevation's crop top to.
+            //
+            // The floor (bottom) target is derived from this SAME bounding box (Min.Z),
+            // not from roomLevel.Elevation — testing showed those two are in different
+            // coordinate frames in this project (Level.Elevation reflects a survey/site
+            // datum offset, ~183 ft, while the room bounding box and the crop shape's own
+            // points both use a different, smaller-scale frame). Deriving both top and
+            // bottom from the same BoundingBoxXYZ guarantees they're consistent with each
+            // other and with what the crop shape itself expects.
+            BoundingBoxXYZ roomBoundingBox = room.get_BoundingBox(null);
+            double roomTopElevation = roomBoundingBox != null
+                ? roomBoundingBox.Max.Z
+                : roomLevel.Elevation + 10.0; // Fallback if the room has no bounding box for some reason
+            double roomFloorElevation = roomBoundingBox != null
+                ? roomBoundingBox.Min.Z
+                : roomLevel.Elevation - 1.0; // Fallback if the room has no bounding box for some reason
+            log.AppendLine($"Room Top Elevation (for crop boundary): {roomTopElevation}");
+            log.AppendLine($"Room Floor Elevation (for crop boundary): {roomFloorElevation}");
 
             // Step 4: Group walls by orthogonal directions
             List<List<XYZ>> wallGroups = GroupWallsByOrthogonalDirections(filteredBoundarySegments.Cast<IList<BoundarySegment>>().ToList(), roomCenter, log, issues);
@@ -344,6 +435,7 @@ namespace Brand_25
                             createdElevations++; // Increment the total counter
 
                             RenameElevation(elevationView, room, elevationNumber, issues);
+                            cropAdjustQueue.Add((elevationView, roomTopElevation, roomFloorElevation));
                             log.AppendLine($"Created Elevation View: {elevationView.Name} (ID: {elevationView.Id}) towards {elevationView.ViewDirection}");
                         }
                     }
@@ -372,6 +464,7 @@ namespace Brand_25
                     {
                         createdElevations++; // Increment the total counter
                         RenameElevation(realElevation, room, elevationNumber, issues);
+                        cropAdjustQueue.Add((realElevation, roomTopElevation, roomFloorElevation));
                         log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
@@ -399,6 +492,7 @@ namespace Brand_25
                     {
                         createdElevations++; // Increment the total counter
                         RenameElevation(realElevation, room, elevationNumber, issues);
+                        cropAdjustQueue.Add((realElevation, roomTopElevation, roomFloorElevation));
                         log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
@@ -582,6 +676,77 @@ namespace Brand_25
             {
                 // Handle naming conflicts (e.g., duplicate names)
                 issues.Add($"Failed to rename elevation view to \"{newName}\": {ex.Message}");
+            }
+        }
+
+        // Raises the crop shape's top to the room's ceiling elevation and lowers its
+        // bottom to the room's floor elevation, while preserving the room-fitted outline
+        // Revit auto-generates when an ElevationMarker is created inside a room.
+        //
+        // This is called from a SEPARATE pass, after every elevation in the batch has
+        // already been created and its creating transaction committed — a standalone
+        // control test confirmed GetCropShape -> modify -> SetCropShape works fine on an
+        // already-existing, already-regenerated view. The repeated "plane parallel to
+        // view plane" / "self-intersection" rejections seen earlier came from attempting
+        // this immediately inside the same transaction as the view's own creation — a
+        // timing issue, not a problem with the geometry or coordinate space. In fact,
+        // GetCropShape()/SetCropShape() both use WORLD coordinates directly — no
+        // transform to local space needed at all, confirmed by that same test.
+        private void SetElevationCropShape(ViewSection elevationView, double topElevationWorldZ, double floorElevationWorldZ, StringBuilder log)
+        {
+            try
+            {
+                ViewCropRegionShapeManager cropShapeManager = elevationView.GetCropRegionShapeManager();
+                IList<CurveLoop> cropShapes = cropShapeManager.GetCropShape();
+
+                if (cropShapes == null || cropShapes.Count == 0)
+                {
+                    log.AppendLine($"  View '{elevationView.Name}': GetCropShape() returned nothing; skipping.");
+                    return;
+                }
+
+                // Edit the first (outer) loop's curves in place — the common case for a
+                // room-fitted crop. Multiple crop loops (split regions) aren't handled here.
+                CurveLoop originalLoop = cropShapes[0];
+
+                double oldTopZ = double.MinValue;
+                double oldBottomZ = double.MaxValue;
+                foreach (Curve curve in originalLoop)
+                {
+                    foreach (XYZ p in new[] { curve.GetEndPoint(0), curve.GetEndPoint(1) })
+                    {
+                        oldTopZ = Math.Max(oldTopZ, p.Z);
+                        oldBottomZ = Math.Min(oldBottomZ, p.Z);
+                    }
+                }
+
+                const double tolerance = 0.01; // feet (~1/8")
+                CurveLoop newLoop = new CurveLoop();
+                foreach (Curve curve in originalLoop)
+                {
+                    XYZ p0 = curve.GetEndPoint(0);
+                    XYZ p1 = curve.GetEndPoint(1);
+
+                    XYZ newP0 = p0;
+                    if (Math.Abs(p0.Z - oldTopZ) < tolerance) newP0 = new XYZ(p0.X, p0.Y, topElevationWorldZ);
+                    else if (Math.Abs(p0.Z - oldBottomZ) < tolerance) newP0 = new XYZ(p0.X, p0.Y, floorElevationWorldZ);
+
+                    XYZ newP1 = p1;
+                    if (Math.Abs(p1.Z - oldTopZ) < tolerance) newP1 = new XYZ(p1.X, p1.Y, topElevationWorldZ);
+                    else if (Math.Abs(p1.Z - oldBottomZ) < tolerance) newP1 = new XYZ(p1.X, p1.Y, floorElevationWorldZ);
+
+                    newLoop.Append(Line.CreateBound(newP0, newP1));
+                }
+
+                cropShapeManager.SetCropShape(newLoop);
+                elevationView.CropBoxActive = true;
+
+                log.AppendLine($"  View '{elevationView.Name}': crop top {oldTopZ:F3} -> {topElevationWorldZ:F3}, " +
+                    $"bottom {oldBottomZ:F3} -> {floorElevationWorldZ:F3} (room-fitted outline preserved).");
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine($"  Warning: Failed to adjust crop shape for view '{elevationView.Name}': {ex.Message}");
             }
         }
 
