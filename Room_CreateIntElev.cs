@@ -300,17 +300,6 @@ namespace Brand_25
                 return 0;
             }
 
-            // Log boundary segments
-            log.AppendLine($"Boundary Segments for Room {room.Name}:");
-            foreach (List<BoundarySegment> segmentList in filteredBoundarySegments)
-            {
-                foreach (BoundarySegment segment in segmentList)
-                {
-                    Curve curve = segment.GetCurve();
-                    log.AppendLine($"  Segment: {curve.GetEndPoint(0)} to {curve.GetEndPoint(1)}");
-                }
-            }
-
             // Step 3: Get room insertion point and level elevation
             LocationPoint location = room.Location as LocationPoint;
             if (location == null)
@@ -331,7 +320,6 @@ namespace Brand_25
             }
 
             XYZ roomCenter = new XYZ(location.Point.X, location.Point.Y, roomLevel.Elevation);
-            log.AppendLine($"Room Center: {roomCenter}");
 
             // With Volume Computations on, the room's bounding box top reflects its real
             // 3D extent — capped by whatever ceiling/roof/floor actually bounds it above —
@@ -352,8 +340,6 @@ namespace Brand_25
             double roomFloorElevation = roomBoundingBox != null
                 ? roomBoundingBox.Min.Z
                 : roomLevel.Elevation - 1.0; // Fallback if the room has no bounding box for some reason
-            log.AppendLine($"Room Top Elevation (for crop boundary): {roomTopElevation}");
-            log.AppendLine($"Room Floor Elevation (for crop boundary): {roomFloorElevation}");
 
             // Step 4: Group walls by orthogonal directions
             List<List<XYZ>> wallGroups = GroupWallsByOrthogonalDirections(filteredBoundarySegments.Cast<IList<BoundarySegment>>().ToList(), roomCenter, log, issues);
@@ -386,8 +372,6 @@ namespace Brand_25
                     continue;
                 }
 
-                log.AppendLine($"Created Elevation Marker: {marker.Id}");
-
                 // Step 6: Create a placeholder elevation at index 2 BEFORE rotating.
                 // A brand-new ElevationMarker apparently needs to already host at least
                 // one view for a subsequent rotation to actually take effect on views
@@ -401,12 +385,10 @@ namespace Brand_25
                     issues.Add(issue);
                     continue;
                 }
-                log.AppendLine($"Created Dummy Elevation: {dummyElevation.Name} (ID: {dummyElevation.Id})");
 
                 // Step 7: Rotate the marker to align with the first wall direction
                 XYZ firstWallDirection = group[0];
                 RotateMarker(doc, marker, firstWallDirection, roomCenter, log);
-                log.AppendLine($"Rotated Marker {marker.Id} to align with wall direction: {firstWallDirection}");
 
                 // With RegenerationOption.Manual, the rotation above isn't reflected in the
                 // model's geometry until we regenerate explicitly. Every CreateElevation call
@@ -424,7 +406,6 @@ namespace Brand_25
                 foreach (XYZ wallDirection in group.Skip(1))
                 {
                     int elevationIndex = GetElevationIndex(wallDirection, firstWallDirection, log);
-                    log.AppendLine($"Creating elevation for wall direction: {wallDirection} (Index: {elevationIndex})");
 
                     try
                     {
@@ -436,7 +417,6 @@ namespace Brand_25
 
                             RenameElevation(elevationView, room, elevationNumber, issues);
                             cropAdjustQueue.Add((elevationView, roomTopElevation, roomFloorElevation));
-                            log.AppendLine($"Created Elevation View: {elevationView.Name} (ID: {elevationView.Id}) towards {elevationView.ViewDirection}");
                         }
                     }
                     catch (Exception ex)
@@ -465,7 +445,6 @@ namespace Brand_25
                         createdElevations++; // Increment the total counter
                         RenameElevation(realElevation, room, elevationNumber, issues);
                         cropAdjustQueue.Add((realElevation, roomTopElevation, roomFloorElevation));
-                        log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
                 }
@@ -483,7 +462,6 @@ namespace Brand_25
                         issues.Add(issue);
                         continue;
                     }
-                    log.AppendLine($"Created Second Dummy Elevation: {dummyElevation2.Name} (ID: {dummyElevation2.Id})");
 
                     doc.Delete(dummyElevation.Id);
 
@@ -493,7 +471,6 @@ namespace Brand_25
                         createdElevations++; // Increment the total counter
                         RenameElevation(realElevation, room, elevationNumber, issues);
                         cropAdjustQueue.Add((realElevation, roomTopElevation, roomFloorElevation));
-                        log.AppendLine($"Created Real Elevation at Index 2: {realElevation.Name} (ID: {realElevation.Id}) towards {realElevation.ViewDirection}");
                         elevationNumber++;
                     }
 
@@ -506,63 +483,46 @@ namespace Brand_25
                     XYZ offsetDirection = GetMarkerDirection(0); // Marker's index 0 direction (east)
                     XYZ offset = offsetDirection * markerOffsetDistance;
                     ElementTransformUtils.MoveElement(doc, marker.Id, offset);
-                    log.AppendLine($"Moved Marker {marker.Id} by {offset}");
                 }
 
                 markerCount++;
             }
 
-            log.AppendLine($"Total Elevations Created for Room {room.Name}: {createdElevations}");
             return createdElevations;
         }
 
         private void RotateMarker(Document doc, ElevationMarker marker, XYZ wallDirection, XYZ roomCenter, StringBuilder log)
         {
-            // Step 1: Calculate the rotation angle
-            //XYZ defaultDirection = XYZ.BasisX; // Default marker direction (east)
-            //double angle = defaultDirection.AngleTo(wallDirection);
-
-            // Step 1: Calculate the rotation angle using Atan2
+            // Calculate the rotation angle using Atan2
             double angle = Math.Atan2(wallDirection.Y, wallDirection.X);
 
-            // Log the calculated angle in degrees
-            double angleInDegrees = angle * 180 / Math.PI;
-            log.AppendLine($"Rotation Angle: {angleInDegrees}°");
-
-            // Step 2: Define the rotation axis (Z-axis for 2D rotation)
-            XYZ rotationAxisDirection = XYZ.BasisZ; // Rotate around the Z-axis
+            // Rotate around the Z-axis (vertical), through the room's center point
+            XYZ rotationAxisDirection = XYZ.BasisZ;
             Line rotationAxis = Line.CreateBound(roomCenter, roomCenter + rotationAxisDirection);
 
-            // Step 3: Rotate the marker
             ElementTransformUtils.RotateElement(doc, marker.Id, rotationAxis, angle);
         }
 
         private int GetElevationIndex(XYZ wallDirection, XYZ firstWallDirection, StringBuilder log)
         {
-            // Calculate the signed angle between the first wall direction and the current wall direction
+            // Map the angle between the first wall direction and this one to the
+            // closest predefined marker direction (0=West, 1=North, 2=East, 3=South).
             double signedAngle = GetSignedAngle(firstWallDirection, wallDirection);
-            double degreeAngle = Math.Round(signedAngle * 180 / Math.PI, 6);
-            log.AppendLine($"Signed Angle: {degreeAngle}°");
 
-            // Map the angle to the closest predefined direction (0, 1, 2, 3)
             if (signedAngle >= -Math.PI / 4 && signedAngle < Math.PI / 4) // -45° to 45°
             {
-                log.AppendLine($"Direction: {wallDirection} → Index: 2(0) (East)");
                 return 2; // East
             }
             else if (signedAngle >= Math.PI / 4 && signedAngle < 3 * Math.PI / 4) // 45° to 135°
             {
-                log.AppendLine($"Direction: {wallDirection} → Index: 1 (North)");
                 return 1; // North
             }
             else if (signedAngle >= 3 * Math.PI / 4 || signedAngle < -3 * Math.PI / 4) // 135° to 180° or -180° to -135°
             {
-                log.AppendLine($"Direction: {wallDirection} → Index: 0(2) (West)");
                 return 0; // West
             }
             else // -135° to -45°
             {
-                log.AppendLine($"Direction: {wallDirection} → Index: 3 (South)");
                 return 3; // South
             }
         }
@@ -578,10 +538,6 @@ namespace Brand_25
             // Calculate the magnitude of the angle using Atan2
             double angle = Math.Atan2(crossProduct.Z, dotProduct);
 
-            // Round the angle to a precision of 1e-6
-            //angle = Math.Round(angle, 6);
-
-            // Ensure the angle is between -π and π
             return angle;
         }
 
@@ -623,7 +579,6 @@ namespace Brand_25
                     if (!wallDirections.Any(dir => dir.IsAlmostEqualTo(projectionVector)))
                     {
                         wallDirections.Add(projectionVector);
-                        log.AppendLine($"Wall Direction: {projectionVector} (Segment: {curve.GetEndPoint(0)} to {curve.GetEndPoint(1)})");
                     }
                 }
             }
@@ -772,11 +727,7 @@ namespace Brand_25
             // re-scanning every ViewPlan in the document for each room.
             viewLookup.TryGetValue((roomLevel.Id, phaseId), out ViewPlan matchingView);
 
-            if (matchingView != null)
-            {
-                log.AppendLine($"Matching View for Room {room.Name} (ID: {room.Id}): {matchingView.Name} (ID: {matchingView.Id})");
-            }
-            else
+            if (matchingView == null)
             {
                 log.AppendLine($"Error: No matching view found for Room {room.Name} (ID: {room.Id}).");
             }
