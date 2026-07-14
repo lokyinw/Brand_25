@@ -57,12 +57,16 @@ namespace Brand_25
             RibbonPanel panel3 = application.CreateRibbonPanel(tabName, "Room");
             PushButtonData btnData3a = new PushButtonData("btn3a", "Re-center\nRoom Point", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_Recentre");
             PushButtonData btnData3b = new PushButtonData("btn3b", "Create\nInternal Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_CreateIntElev");
+            PushButtonData btnData3c = new PushButtonData("btn3c", "Place Elev\non Sheet", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_PlaceOnSheets");
             btnData3a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Room_Re-center_32.png");
             btnData3b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.intelev_32.png");
+            btnData3c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData3a.ToolTip = "Relocate the Room insertion point to the centre of the room";
             btnData3b.ToolTip = "Create internal elevations for selected rooms";
+            btnData3c.ToolTip = "Place internal elevation views onto a sheet in a row-packed layout, creating additional sheets as needed.";
             panel3.AddItem(btnData3a);
             panel3.AddItem(btnData3b);
+            panel3.AddItem(btnData3c);
 
 
             RibbonPanel panel4 = application.CreateRibbonPanel(tabName, "Text");

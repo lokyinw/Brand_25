@@ -1,0 +1,496 @@
+﻿using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace Brand_25
+{
+    // Translated from the Dynamo graph "IntEle2_Sheet_[R3]_Py3.dyn". Places a sorted set
+    // of internal elevation views onto a sheet in left-to-right rows, wrapping to a new
+    // row when the running width exceeds the configured Return Width, and creating an
+    // additional sheet (duplicating the title block, incrementing sheet number/name,
+    // copying BA_SheetSeries, setting BA_SRT_Level 01) when a row would run below the
+    // configured Lower Margin.
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
+    public class Elev_PlaceOnSheets : IExternalCommand
+    {
+        // Matches the original script's mm -> feet conversion (1 ft = 304.8 mm).
+        private const double MmToFeet = 0.0032808;
+
+        // A1 landscape paper height, and the title block's own top margins, in mm —
+        // carried over from the original script. If your title block isn't A1, or its
+        // margins differ, these three constants are the ones to adjust.
+        private const double PaperHeightMm = 594.0;
+        private const double TopMarginMm = 21.0;
+        private const double TopMarginBMm = 15.0;
+
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            UIApplication uiApp = commandData.Application;
+            UIDocument uiDoc = uiApp.ActiveUIDocument;
+            Document doc = uiDoc.Document;
+            string credit = "Last Modified by Lok on 2026-07-14. Beta 0.10";
+
+            StringBuilder log = new StringBuilder();
+            List<string> issues = new List<string>();
+
+            try
+            {
+                // Step 1: collect elevation view family types and project phases for the dialog
+                List<ViewFamilyType> elevationTypes = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewFamilyType))
+                    .Cast<ViewFamilyType>()
+                    .Where(vft => vft.ViewFamily == ViewFamily.Elevation)
+                    .ToList();
+
+                if (elevationTypes.Count == 0)
+                {
+                    TaskDialog.Show("Error", "No elevation view types found in the document.");
+                    return Result.Cancelled;
+                }
+
+                List<Phase> phases = new FilteredElementCollector(doc)
+                    .OfClass(typeof(Phase))
+                    .Cast<Phase>()
+                    .OrderBy(p => p.get_Parameter(BuiltInParameter.PHASE_SEQUENCE_NUMBER).AsInteger())
+                    .ToList();
+
+                if (phases.Count == 0)
+                {
+                    TaskDialog.Show("Error", "No phases found in the document.");
+                    return Result.Cancelled;
+                }
+
+                // Step 2: gather user input
+                Selection_SheetLayout inputWindow = new Selection_SheetLayout(elevationTypes, phases, credit);
+                if (inputWindow.ShowDialog() != true)
+                {
+                    return Result.Cancelled;
+                }
+
+                ViewSheet startingSheet = FindSheetByNumber(doc, inputWindow.SheetNumber);
+                if (startingSheet == null)
+                {
+                    new Warning("Oops...", $"No sheet found with number \"{inputWindow.SheetNumber}\".", credit).ShowDialog();
+                    return Result.Cancelled;
+                }
+
+                // Step 3: collect matching elevation views (exact type + phase match,
+                // rather than the original script's substring match on a parameter string —
+                // this is more robust since it can't accidentally match an unrelated view
+                // whose type/phase name happens to contain the same text).
+                List<View> elevationViews = FindMatchingElevationViews(doc, inputWindow.SelectedViewFamilyType, inputWindow.SelectedPhase);
+                if (elevationViews.Count == 0)
+                {
+                    new Warning("Oops...", "No elevation views found matching the selected type and phase.", credit).ShowDialog();
+                    return Result.Cancelled;
+                }
+
+                // Step 4: sort in a logical (natural) order — so "...- 9" sorts before
+                // "...- 10", following the room number at the start of each view's name —
+                // rather than the original script's sort, which was a leftover from a
+                // different naming convention.
+                elevationViews = elevationViews.OrderBy(v => NaturalSortKey(v.Name), StringComparer.Ordinal).ToList();
+                log.AppendLine($"Found {elevationViews.Count} matching elevation view(s):");
+                foreach (View v in elevationViews) log.AppendLine($"  {v.Name}");
+
+                // Step 5: measurement pass. Each view is temporarily placed on the starting
+                // sheet purely to read its rendered viewport size and its "dist" (the
+                // vertical offset needed to align that view's Level line consistently
+                // across all viewports), then removed. This can't be computed from the
+                // crop box alone since it depends on how Revit actually renders the
+                // viewport's content at that view's scale.
+                List<double> widths = new List<double>();
+                List<double> heights = new List<double>();
+                List<double> dists = new List<double>();
+
+                using (Transaction measureTrans = new Transaction(doc, "LW_Measure Elevation Viewports"))
+                {
+                    measureTrans.Start();
+
+                    foreach (View v in elevationViews)
+                    {
+                        Viewport vp = Viewport.Create(doc, startingSheet.Id, v.Id, XYZ.Zero);
+                        if (vp == null)
+                        {
+                            string issue = $"View '{v.Name}': failed to create a measurement viewport.";
+                            log.AppendLine($"Error: {issue}");
+                            issues.Add(issue);
+                            widths.Add(0);
+                            heights.Add(0);
+                            dists.Add(0);
+                            continue;
+                        }
+
+                        Outline outline = vp.GetBoxOutline();
+                        widths.Add(outline.MaximumPoint.X);
+                        heights.Add(outline.MaximumPoint.Y);
+                        //widths.Add(outline.MaximumPoint.X - outline.MinimumPoint.X);
+                        //heights.Add(outline.MaximumPoint.Y - outline.MinimumPoint.Y);
+
+                        double dist = 0;
+                        bool foundLevel = false;
+                        try
+                        {
+                            // View.CropBox is in the view's own LOCAL coordinate system,
+                            // where Y is vertical (confirmed extensively while building
+                            // Room_CreateIntElev's crop-adjustment feature).
+                            BoundingBoxXYZ cropBox = v.CropBox;
+                            double cropCenterY = (cropBox.Min.Y + cropBox.Max.Y) / 2.0;
+
+                            List<Level> levelsInView = new FilteredElementCollector(doc, v.Id)
+                                .OfCategory(BuiltInCategory.OST_Levels)
+                                .Cast<Level>()
+                                .ToList();
+
+                            foreach (Level level in levelsInView)
+                            {
+                                IList<Curve> curves = level.GetCurvesInView(DatumExtentType.ViewSpecific, v);
+                                if (curves == null || curves.Count == 0) continue;
+
+                                // NOTE: this mixes a LOCAL coordinate (cropCenterY) with what
+                                // GetCurvesInView returns for the level's displayed line — the
+                                // original script did the same subtraction directly. This only
+                                // produces a meaningful distance if the view's local Y and the
+                                // level curve's Z share the same reference (true whenever the
+                                // view's Transform.Origin.Z is 0, which was the case for every
+                                // view we inspected while building the crop-adjustment feature,
+                                // but hasn't been verified specifically for these views — worth
+                                // checking if the alignment looks off in testing).
+                                double levelZ = curves[0].GetEndPoint(0).Z;
+                                dist = (cropCenterY - levelZ) / v.Scale;
+                                foundLevel = true;
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            log.AppendLine($"Error measuring level offset for view '{v.Name}': {ex.Message}");
+                        }
+
+                        if (!foundLevel)
+                        {
+                            string issue = $"View '{v.Name}': no level found in view for alignment; using dist=0.";
+                            log.AppendLine($"Warning: {issue}");
+                            issues.Add(issue);
+                        }
+                        dists.Add(dist);
+
+                        doc.Delete(vp.Id);
+                    }
+
+                    measureTrans.Commit();
+                }
+
+                // Step 6: layout algorithm — pack views into rows left-to-right, wrapping
+                // to a new row when the running width would exceed Return Width, and
+                // marking a new sheet when a row would fall below Lower Margin.
+                LayoutResult layout = ComputeLayout(
+                    widths, heights, dists,
+                    inputWindow.LeftMarginMm * MmToFeet,
+                    inputWindow.XSpacingMm * MmToFeet,
+                    inputWindow.YSpacingMm * MmToFeet,
+                    inputWindow.ReturnWidthMm * MmToFeet,
+                    inputWindow.LowerMarginMm * MmToFeet);
+
+                // Step 7: create any additional sheets the layout needs.
+                List<ViewSheet> sheetList = new List<ViewSheet> { startingSheet };
+                using (Transaction sheetTrans = new Transaction(doc, "LW_Create Additional Sheets"))
+                {
+                    sheetTrans.Start();
+
+                    ViewSheet current = startingSheet;
+                    for (int i = 1; i <= layout.MaxSheetIndex; i++)
+                    {
+                        ViewSheet nextSheet = CreateNextSheet(doc, current, log, issues);
+                        if (nextSheet == null)
+                        {
+                            string issue = "Failed to create an additional sheet; remaining views will be skipped.";
+                            log.AppendLine($"Error: {issue}");
+                            issues.Add(issue);
+                            break;
+                        }
+                        sheetList.Add(nextSheet);
+                        current = nextSheet;
+                    }
+
+                    sheetTrans.Commit();
+                }
+
+                // Step 8: place the real viewports at their computed positions.
+                int placedCount = 0;
+                using (Transaction placeTrans = new Transaction(doc, "LW_Place Elevations on Sheet"))
+                {
+                    placeTrans.Start();
+
+                    for (int i = 0; i < elevationViews.Count; i++)
+                    {
+                        int sheetIndex = layout.PlaceSheetIndex[i];
+                        if (sheetIndex >= sheetList.Count)
+                        {
+                            string issue = $"View '{elevationViews[i].Name}': target sheet could not be created; skipped.";
+                            log.AppendLine($"Error: {issue}");
+                            issues.Add(issue);
+                            continue;
+                        }
+
+                        Viewport vp = Viewport.Create(doc, sheetList[sheetIndex].Id, elevationViews[i].Id, XYZ.Zero);
+                        if (vp == null)
+                        {
+                            string issue = $"View '{elevationViews[i].Name}': failed to place on sheet.";
+                            log.AppendLine($"Error: {issue}");
+                            issues.Add(issue);
+                            continue;
+                        }
+
+                        vp.SetBoxCenter(new XYZ(layout.PlaceX[i], layout.PlaceY[i], 0));
+                        placedCount++;
+                    }
+
+                    placeTrans.Commit();
+                }
+
+                // Show summary
+                string summary = $"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).";
+                if (issues.Count > 0)
+                {
+                    summary += $"\n\n{issues.Count} issue(s) were encountered — see the log for details.";
+                }
+                new Warning("Success", summary, credit).ShowDialog();
+                log.AppendLine();
+                log.AppendLine(summary);
+                if (issues.Count > 0)
+                {
+                    log.AppendLine();
+                    log.AppendLine($"=== {issues.Count} Issue(s) ===");
+                    foreach (string issue in issues) log.AppendLine(issue);
+                }
+
+                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ElevPlaceOnSheetsLog.txt");
+                try
+                {
+                    File.WriteAllText(logFilePath, log.ToString());
+                }
+                catch
+                {
+                    // Non-critical — don't fail the whole command over a log file write issue.
+                }
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                message = ex.Message;
+                TaskDialog.Show("Error", $"An error occurred: {ex.Message}\n\nDebug Log:\n{log}");
+                return Result.Failed;
+            }
+        }
+
+        private ViewSheet FindSheetByNumber(Document doc, string number)
+        {
+            return new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_Sheets)
+                .WhereElementIsNotElementType()
+                .Cast<ViewSheet>()
+                .FirstOrDefault(s => s.get_Parameter(BuiltInParameter.SHEET_NUMBER).AsString() == number);
+        }
+
+        private List<View> FindMatchingElevationViews(Document doc, ViewFamilyType elevationType, Phase phase)
+        {
+            return new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => v.ViewType == ViewType.Elevation
+                            && !v.IsTemplate
+                            && v.GetTypeId() == elevationType.Id
+                            && v.get_Parameter(BuiltInParameter.VIEW_PHASE) != null
+                            && v.get_Parameter(BuiltInParameter.VIEW_PHASE).AsElementId() == phase.Id)
+                .ToList();
+        }
+
+        // Splits a name into digit / non-digit runs and pads digit runs to a fixed width,
+        // so an ordinary string sort on the result produces natural numeric ordering
+        // (e.g. "Room 9" sorts before "Room 10"). This replaces the original script's
+        // sort, which assumed a different, no-longer-used naming convention.
+        private string NaturalSortKey(string name)
+        {
+            return Regex.Replace(name, "[0-9]+", match => match.Value.PadLeft(10, '0'));
+        }
+
+        private class LayoutResult
+        {
+            public List<double> PlaceX = new List<double>();
+            public List<double> PlaceY = new List<double>();
+            public List<int> PlaceSheetIndex = new List<int>();
+            public int MaxSheetIndex;
+        }
+
+        // Faithful translation of the original "Place Views on Sheet" packing algorithm:
+        // views are added left-to-right; when the next view wouldn't fit within
+        // returnWidthFt, the current row is finalized (vertically aligned so every view's
+        // Level line lines up) and a new row starts. If a row's aligned position would
+        // fall below lowerMarginFt from the bottom of the sheet, a new sheet is used
+        // instead and the row starts again from the top.
+        private LayoutResult ComputeLayout(List<double> widths, List<double> heights, List<double> dists,
+            double leftMarginFt, double xSpacingFt, double ySpacingFt, double returnWidthFt, double lowerMarginFt)
+        {
+            double placeY = (PaperHeightMm - TopMarginMm - TopMarginBMm) * MmToFeet;
+            double placeX = leftMarginFt - xSpacingFt;
+            double topOfSheetY = (PaperHeightMm - TopMarginMm - TopMarginBMm) * MmToFeet;
+
+            double prevWidth = 0;
+            List<double> rowHeights = new List<double>();
+            List<double> rowDists = new List<double>();
+            int sheetIndex = 0;
+
+            LayoutResult result = new LayoutResult();
+            // Pre-size the output lists so we can assign by index in any order, matching
+            // the original script's index bookkeeping.
+            for (int i = 0; i < widths.Count; i++)
+            {
+                result.PlaceX.Add(0);
+                result.PlaceY.Add(0);
+                result.PlaceSheetIndex.Add(0);
+            }
+
+            void FinalizeRow(int lastIndexInRow, int rowStartIndex)
+            {
+                double alignY = placeY - rowHeights.Max() - rowDists.Max();
+
+                if (alignY < lowerMarginFt)
+                {
+                    sheetIndex++;
+                    placeY = topOfSheetY;
+                    alignY = placeY - rowHeights.Max() - rowDists.Max();
+                }
+
+                for (int i = 0; i < rowHeights.Count; i++)
+                {
+                    int index = rowStartIndex + i;
+                    double y = alignY + dists[index];
+                    result.PlaceY[index] = y;
+                    result.PlaceSheetIndex[index] = sheetIndex;
+                }
+
+                //int lastIndex = rowStartIndex + rowHeights.Count - 1;
+                //placeY = result.PlaceY[lastIndex];
+            }
+
+            int currentRowStart = 0;
+
+            for (int ind = 0; ind < widths.Count; ind++)
+            {
+                double vX = widths[ind];
+
+                if (placeX + prevWidth + xSpacingFt + vX + vX < returnWidthFt)
+                {
+                    // Fits in the current row.
+                    placeX = placeX + prevWidth + xSpacingFt + vX;
+                    result.PlaceX[ind] = placeX;
+                    prevWidth = vX;
+                    rowHeights.Add(heights[ind]);
+                    rowDists.Add(dists[ind]);
+
+                    if (ind == widths.Count - 1)
+                    {
+                        FinalizeRow(ind, currentRowStart);
+                    }
+                }
+                else
+                {
+                    // Doesn't fit — finalize the row accumulated so far...
+                    FinalizeRow(ind - 1, currentRowStart);
+                    placeY = (result.PlaceY[ind - 1]) - dists[ind - 1] - ySpacingFt; // set placeY for next row, relative to the row just finalized
+
+                    // ...then start a new row with the current view.
+                    rowHeights.Clear();
+                    rowDists.Clear();
+                    currentRowStart = ind;
+
+                    prevWidth = vX;
+                    placeX = leftMarginFt + vX;
+                    result.PlaceX[ind] = placeX;
+                    rowHeights.Add(heights[ind]);
+                    rowDists.Add(dists[ind]);
+
+                    if (ind == widths.Count - 1)
+                    {
+                        FinalizeRow(ind, currentRowStart);
+                    }
+                }
+            }
+
+            result.MaxSheetIndex = sheetIndex;
+            return result;
+        }
+
+        // Creates the next sheet in sequence by duplicating the reference sheet's title
+        // block, incrementing the sheet number and name's final digit (matching the
+        // original script; per team confirmation, a project won't need more than 9
+        // elevation sheets, so a single-digit increment is sufficient), and copying over
+        // the BA_SheetSeries shared parameter and BA_SRT_Level 01 value.
+        private ViewSheet CreateNextSheet(Document doc, ViewSheet referenceSheet, StringBuilder log, List<string> issues)
+        {
+            string currentNumber = referenceSheet.get_Parameter(BuiltInParameter.SHEET_NUMBER).AsString();
+            string currentName = referenceSheet.get_Parameter(BuiltInParameter.SHEET_NAME).AsString();
+
+            if (!TryIncrementLastDigit(currentNumber, out string nextNumber) ||
+                !TryIncrementLastDigit(currentName, out string nextName))
+            {
+                string issue = $"Sheet '{currentNumber}': number or name doesn't end in a digit; can't auto-increment.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
+                return null;
+            }
+
+            Parameter sheetSeriesParam = referenceSheet.LookupParameter("BA_SheetSeries");
+            string sheetSeriesValue = sheetSeriesParam?.AsString();
+
+            FamilyInstance titleBlock = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                .WhereElementIsNotElementType()
+                .Cast<FamilyInstance>()
+                .FirstOrDefault(tb => tb.get_Parameter(BuiltInParameter.SHEET_NUMBER)?.AsString() == currentNumber);
+
+            if (titleBlock == null)
+            {
+                string issue = $"Sheet '{currentNumber}': couldn't find its title block instance.";
+                log.AppendLine($"Error: {issue}");
+                issues.Add(issue);
+                return null;
+            }
+
+            ViewSheet newSheet = ViewSheet.Create(doc, titleBlock.GetTypeId());
+            newSheet.get_Parameter(BuiltInParameter.SHEET_NUMBER).Set(nextNumber);
+            newSheet.get_Parameter(BuiltInParameter.SHEET_NAME).Set(nextName);
+
+            if (sheetSeriesValue != null)
+            {
+                newSheet.LookupParameter("BA_SheetSeries")?.Set(sheetSeriesValue);
+            }
+            newSheet.LookupParameter("BA_SRT_Level 01")?.Set("100 Building");
+
+            log.AppendLine($"Created additional sheet: {nextNumber} - {nextName}");
+            return newSheet;
+        }
+
+        private bool TryIncrementLastDigit(string value, out string result)
+        {
+            result = value;
+            if (string.IsNullOrEmpty(value) || !char.IsDigit(value[value.Length - 1]))
+            {
+                return false;
+            }
+
+            int lastDigit = value[value.Length - 1] - '0';
+            result = value.Substring(0, value.Length - 1) + (lastDigit + 1);
+            return true;
+        }
+    }
+}
