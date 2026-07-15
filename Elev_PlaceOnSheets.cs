@@ -11,7 +11,7 @@ using System.Text.RegularExpressions;
 
 namespace Brand_25
 {
-    // Translated from the Dynamo graph "IntEle2_Sheet_[R3]_Py3.dyn". Places a sorted set
+    // Places a sorted set
     // of internal elevation views onto a sheet in left-to-right rows, wrapping to a new
     // row when the running width exceeds the configured Return Width, and creating an
     // additional sheet (duplicating the title block, incrementing sheet number/name,
@@ -21,7 +21,7 @@ namespace Brand_25
     [Regeneration(RegenerationOption.Manual)]
     public class Elev_PlaceOnSheets : IExternalCommand
     {
-        // Matches the original script's mm -> feet conversion (1 ft = 304.8 mm).
+        // 1 ft = 304.8 mm.
         private const double MmToFeet = 0.0032808;
 
         // A1 landscape paper height, and the title block's own top margins, in mm —
@@ -116,7 +116,15 @@ namespace Brand_25
                 List<(View View, Room Room)> matchedViews = new List<(View, Room)>();
                 foreach (View v in elevationViews)
                 {
-                    Room matchedRoom = allRooms.FirstOrDefault(r => v.Name.StartsWith($"{r.Number} {r.Name} - "));
+                    Room matchedRoom = allRooms.FirstOrDefault(r =>
+                    {
+                        Parameter nameParam = r.get_Parameter(BuiltInParameter.ROOM_NAME);
+                        string roomName = nameParam != null && nameParam.HasValue ? nameParam.AsString() : "Unknown";
+
+                        return v.Name.StartsWith($"{r.Number} {roomName} - ");
+                    });
+
+                    //Room matchedRoom = allRooms.FirstOrDefault(r => v.Name.StartsWith($"{r.Number} {r.Name} - "));
                     if (matchedRoom == null)
                     {
                         string issue = $"View '{v.Name}': doesn't match any room's naming pattern (not created by Room_CreateIntElev?) — skipped.";
@@ -178,21 +186,11 @@ namespace Brand_25
                         try
                         {
                             // View.CropBox is in the view's own LOCAL coordinate system,
-                            // where Y is vertical (confirmed extensively while building
-                            // Room_CreateIntElev's crop-adjustment feature).
+                            // where Y is vertical
                             BoundingBoxXYZ cropBox = v.CropBox;
                             double cropCenterY = (cropBox.Min.Y + cropBox.Max.Y) / 2.0;
 
-                            // Use the room's OWN level directly, rather than scanning for
-                            // "whichever Level happens to be visible in this view" — this
-                            // is unambiguous since we already matched this view back to
-                            // its originating room. DatumExtentType.Model (rather than
-                            // ViewSpecific) returns the level's true position regardless
-                            // of whether the line is currently visible within the view's
-                            // crop — confirmed via RevitLookup to give the same Z value as
-                            // ViewSpecific when the line IS visible, but unlike
-                            // ViewSpecific, it doesn't silently fail on the increasingly
-                            // tight crops Room_CreateIntElev now produces.
+                            // Use the room's OWN level directly
                             Level roomLevel = doc.GetElement(room.LevelId) as Level;
                             if (roomLevel != null)
                             {
@@ -240,6 +238,14 @@ namespace Brand_25
                 using (Transaction sheetTrans = new Transaction(doc, "LW_Create Additional Sheets"))
                 {
                     sheetTrans.Start();
+
+                    // Check if the starting sheet name needs the " 01" suffix applied
+                    string currentName = startingSheet.get_Parameter(BuiltInParameter.SHEET_NAME).AsString();
+                    if (!TryIncrementLastDigit(currentName, out _))
+                    {
+                        startingSheet.get_Parameter(BuiltInParameter.SHEET_NAME).Set($"{currentName} 1");
+                        log.AppendLine($"Renamed initial sheet to: {startingSheet.SheetNumber} - {currentName} 1");
+                    }
 
                     ViewSheet current = startingSheet;
                     for (int i = 1; i <= layout.MaxSheetIndex; i++)
@@ -573,13 +579,18 @@ namespace Brand_25
             string currentNumber = referenceSheet.get_Parameter(BuiltInParameter.SHEET_NUMBER).AsString();
             string currentName = referenceSheet.get_Parameter(BuiltInParameter.SHEET_NAME).AsString();
 
-            if (!TryIncrementLastDigit(currentNumber, out string nextNumber) ||
-                !TryIncrementLastDigit(currentName, out string nextName))
+            if (!TryIncrementLastDigit(currentNumber, out string nextNumber))
             {
-                string issue = $"Sheet '{currentNumber}': number or name doesn't end in a digit; can't auto-increment.";
+                string issue = $"Sheet '{currentNumber}': number doesn't end in a digit; can't auto-increment.";
                 log.AppendLine($"Error: {issue}");
                 issues.Add(issue);
                 return null;
+            }
+
+            // This will now successfully increment "xxx 01" to "xxx 02", "xxx 03", etc.
+            if (!TryIncrementLastDigit(currentName, out string nextName))
+            {
+                nextName = $"{currentName} 1";
             }
 
             Parameter sheetSeriesParam = referenceSheet.LookupParameter("BA_SheetSeries");

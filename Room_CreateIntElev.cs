@@ -622,7 +622,9 @@ namespace Brand_25
 
         private void RenameElevation(ViewSection elevationView, Room room, int elevationNumber, List<string> issues)
         {
-            string newName = $"{room.Number} {room.Name} - {elevationNumber}";
+            Parameter nameParam = room.get_Parameter(BuiltInParameter.ROOM_NAME);
+            string roomName = nameParam != null && nameParam.HasValue ? nameParam.AsString() : "No Room Name";
+            string newName = $"{room.Number} {roomName} - {elevationNumber}";
             try
             {
                 elevationView.Name = newName;
