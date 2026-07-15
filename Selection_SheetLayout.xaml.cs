@@ -21,6 +21,7 @@ namespace Brand_25
         public double YSpacingMm { get; private set; }
         public double ReturnWidthMm { get; private set; }
         public double LowerMarginMm { get; private set; }
+        public double LevelLineScale { get; private set; }
 
         public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default")
         {
@@ -41,6 +42,7 @@ namespace Brand_25
             YSpacingBox.Text = "20";
             ReturnWidthBox.Text = "720";
             LowerMarginBox.Text = "20";
+            LevelLineScaleBox.Text = "150";
 
             List<ViewFamilyType> orderedTypes = elevationTypes.OrderBy(t => t.Name).ToList();
             ViewTypeCombo.ItemsSource = orderedTypes;
@@ -81,6 +83,7 @@ namespace Brand_25
             ParseNumber(YSpacingBox, "Y Spacing", out double ySpacing);
             ParseNumber(ReturnWidthBox, "Return Width", out double returnWidth);
             ParseNumber(LowerMarginBox, "Lower Margin", out double lowerMargin);
+            ParseNumber(LevelLineScaleBox, "Level Line Trim", out double levelLineScale);
 
             if (problems.Count > 0)
             {
@@ -97,6 +100,7 @@ namespace Brand_25
             YSpacingMm = ySpacing;
             ReturnWidthMm = returnWidth;
             LowerMarginMm = lowerMargin;
+            LevelLineScale = levelLineScale;
 
             this.DialogResult = true;
         }

@@ -261,6 +261,7 @@ namespace Brand_25
 
                 // Step 8: place the real viewports at their computed positions.
                 int placedCount = 0;
+                List<int> placedIndices = new List<int>();
                 using (Transaction placeTrans = new Transaction(doc, "LW_Place Elevations on Sheet"))
                 {
                     placeTrans.Start();
@@ -287,9 +288,35 @@ namespace Brand_25
 
                         vp.SetBoxCenter(new XYZ(layout.PlaceX[i], layout.PlaceY[i], 0));
                         placedCount++;
+                        placedIndices.Add(i);
                     }
 
                     placeTrans.Commit();
+                }
+
+                // Step 9: for every successfully placed view, set "Title on Sheet" from its
+                // room, and clean up level line display — hide bubbles on every level
+                // visible in the view (there can be more than one for an atrium or a room
+                // adjacent to a split level), shorten each line, and, only for the view
+                // that ends its row, retain the bubble on the right so the row still
+                // visually indicates which floor it belongs to.
+                using (Transaction titleTrans = new Transaction(doc, "LW_Set View Titles and Level Display"))
+                {
+                    titleTrans.Start();
+
+                    foreach (int i in placedIndices)
+                    {
+                        View v = elevationViews[i];
+                        Room room = matchedRooms[i];
+                        bool isRowEnd = layout.IsRowEnd[i];
+
+                        Parameter titleParam = v.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
+                        titleParam?.Set($"{room.Number} {room.Name}");
+
+                        UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelLineScale, log, issues);
+                    }
+
+                    titleTrans.Commit();
                 }
 
                 // Show summary
@@ -325,6 +352,72 @@ namespace Brand_25
                 message = ex.Message;
                 TaskDialog.Show("Error", $"An error occurred: {ex.Message}\n\nDebug Log:\n{log}");
                 return Result.Failed;
+            }
+        }
+
+        // Hides the bubble at both ends of every level visible in the view, shortens each
+        // level's line, and — only when this view ends its row — leaves the RIGHT-hand
+        // bubble visible, so the row still visually indicates which floor it belongs to.
+        // Translated from a Dynamo Python node the team already relies on; the trim
+        // formula (scale / view.Scale) is kept exactly as-is rather than reinterpreted.
+        private void UpdateLevelDisplay(Document doc, View view, bool isRowEnd, double lineScale, StringBuilder log, List<string> issues)
+        {
+            List<Level> levelsInView = new FilteredElementCollector(doc, view.Id)
+                .OfCategory(BuiltInCategory.OST_Levels)
+                .Cast<Level>()
+                .ToList();
+
+            if (levelsInView.Count == 0) return;
+
+            // Used to work out which end of each level's line is on the RIGHT in this
+            // specific view, so the row-end retained bubble is on the correct side
+            // regardless of the view's rotation. Not part of the original script — worth
+            // confirming visually the first time this runs.
+            Transform transform = view.CropBox.Transform;
+            double s = view.Scale;
+
+            foreach (Level level in levelsInView)
+            {
+                try
+                {
+                    IList<Curve> curves = level.GetCurvesInView(DatumExtentType.ViewSpecific, view);
+                    if (curves == null || curves.Count == 0) continue;
+
+                    Curve curve = curves[0];
+                    XYZ ep0 = curve.GetEndPoint(0);
+                    XYZ ep1 = curve.GetEndPoint(1);
+
+                    double localX0 = transform.Inverse.OfPoint(ep0).X;
+                    double localX1 = transform.Inverse.OfPoint(ep1).X;
+                    bool end0IsRight = localX0 > localX1;
+                    DatumEnds rightEnd = end0IsRight ? DatumEnds.End0 : DatumEnds.End1;
+                    DatumEnds leftEnd = end0IsRight ? DatumEnds.End1 : DatumEnds.End0;
+
+                    if (isRowEnd)
+                    {
+                        // Keep the right-hand bubble to mark this row's floor; hide the left.
+                        if (level.IsBubbleVisibleInView(leftEnd, view)) level.HideBubbleInView(leftEnd, view);
+                    }
+                    else
+                    {
+                        if (level.IsBubbleVisibleInView(DatumEnds.End0, view)) level.HideBubbleInView(DatumEnds.End0, view);
+                        if (level.IsBubbleVisibleInView(DatumEnds.End1, view)) level.HideBubbleInView(DatumEnds.End1, view);
+                    }
+
+                    // Shorten the line from each end — same technique as the original
+                    // script: offset along the curve's own direction by (scale / view.Scale).
+                    XYZ direction = (curve as Line).Direction;
+                    XYZ newEp0 = new XYZ(ep0.X + direction.X * lineScale / s, ep0.Y + direction.Y * lineScale / s, ep0.Z + direction.Z * lineScale / s);
+                    XYZ newEp1 = new XYZ(ep1.X - direction.X * lineScale / s, ep1.Y - direction.Y * lineScale / s, ep1.Z - direction.Z * lineScale / s);
+                    Curve newCurve = Line.CreateBound(newEp0, newEp1);
+                    level.SetCurveInView(DatumExtentType.ViewSpecific, view, newCurve);
+                }
+                catch (Exception ex)
+                {
+                    string issue = $"View '{view.Name}': failed to adjust level '{level.Name}' display: {ex.Message}";
+                    log.AppendLine($"Warning: {issue}");
+                    issues.Add(issue);
+                }
             }
         }
 
@@ -364,6 +457,7 @@ namespace Brand_25
             public List<double> PlaceX = new List<double>();
             public List<double> PlaceY = new List<double>();
             public List<int> PlaceSheetIndex = new List<int>();
+            public List<bool> IsRowEnd = new List<bool>();
             public int MaxSheetIndex;
         }
 
@@ -393,6 +487,7 @@ namespace Brand_25
                 result.PlaceX.Add(0);
                 result.PlaceY.Add(0);
                 result.PlaceSheetIndex.Add(0);
+                result.IsRowEnd.Add(false);
             }
 
             void FinalizeRow(int lastIndexInRow, int rowStartIndex)
@@ -413,6 +508,8 @@ namespace Brand_25
                     result.PlaceY[index] = y;
                     result.PlaceSheetIndex[index] = sheetIndex;
                 }
+
+                result.IsRowEnd[rowStartIndex + rowHeights.Count - 1] = true;
 
                 //int lastIndex = rowStartIndex + rowHeights.Count - 1;
                 //placeY = result.PlaceY[lastIndex];
