@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
@@ -100,6 +101,43 @@ namespace Brand_25
                 log.AppendLine($"Found {elevationViews.Count} matching elevation view(s):");
                 foreach (View v in elevationViews) log.AppendLine($"  {v.Name}");
 
+                // Step 4.5: match each view back to the Room it was built from (by the
+                // "{Number} {Name} - " naming convention Room_CreateIntElev uses), so we
+                // can use that room's actual Level directly — rather than guessing at
+                // "whichever level happens to be visible in this view". Views that don't
+                // match any room (i.e. weren't created by Room_CreateIntElev) are skipped
+                // entirely rather than placed on the sheet.
+                List<Room> allRooms = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_Rooms)
+                    .WhereElementIsNotElementType()
+                    .Cast<Room>()
+                    .ToList();
+
+                List<(View View, Room Room)> matchedViews = new List<(View, Room)>();
+                foreach (View v in elevationViews)
+                {
+                    Room matchedRoom = allRooms.FirstOrDefault(r => v.Name.StartsWith($"{r.Number} {r.Name} - "));
+                    if (matchedRoom == null)
+                    {
+                        string issue = $"View '{v.Name}': doesn't match any room's naming pattern (not created by Room_CreateIntElev?) — skipped.";
+                        log.AppendLine($"Warning: {issue}");
+                        issues.Add(issue);
+                        continue;
+                    }
+                    matchedViews.Add((v, matchedRoom));
+                }
+
+                if (matchedViews.Count == 0)
+                {
+                    new Warning("Oops...", "None of the matching elevation views could be matched back to a room. See the log for details.", credit).ShowDialog();
+                    return Result.Cancelled;
+                }
+
+                // Collapse back into parallel lists (same order), so the rest of the
+                // pipeline below — which indexes into elevationViews — needs minimal change.
+                elevationViews = matchedViews.Select(m => m.View).ToList();
+                List<Room> matchedRooms = matchedViews.Select(m => m.Room).ToList();
+
                 // Step 5: measurement pass. Each view is temporarily placed on the starting
                 // sheet purely to read its rendered viewport size and its "dist" (the
                 // vertical offset needed to align that view's Level line consistently
@@ -114,8 +152,11 @@ namespace Brand_25
                 {
                     measureTrans.Start();
 
-                    foreach (View v in elevationViews)
+                    for (int i = 0; i < elevationViews.Count; i++)
                     {
+                        View v = elevationViews[i];
+                        Room room = matchedRooms[i];
+
                         Viewport vp = Viewport.Create(doc, startingSheet.Id, v.Id, XYZ.Zero);
                         if (vp == null)
                         {
@@ -131,8 +172,6 @@ namespace Brand_25
                         Outline outline = vp.GetBoxOutline();
                         widths.Add(outline.MaximumPoint.X);
                         heights.Add(outline.MaximumPoint.Y);
-                        //widths.Add(outline.MaximumPoint.X - outline.MinimumPoint.X);
-                        //heights.Add(outline.MaximumPoint.Y - outline.MinimumPoint.Y);
 
                         double dist = 0;
                         bool foundLevel = false;
@@ -144,29 +183,26 @@ namespace Brand_25
                             BoundingBoxXYZ cropBox = v.CropBox;
                             double cropCenterY = (cropBox.Min.Y + cropBox.Max.Y) / 2.0;
 
-                            List<Level> levelsInView = new FilteredElementCollector(doc, v.Id)
-                                .OfCategory(BuiltInCategory.OST_Levels)
-                                .Cast<Level>()
-                                .ToList();
-
-                            foreach (Level level in levelsInView)
+                            // Use the room's OWN level directly, rather than scanning for
+                            // "whichever Level happens to be visible in this view" — this
+                            // is unambiguous since we already matched this view back to
+                            // its originating room. DatumExtentType.Model (rather than
+                            // ViewSpecific) returns the level's true position regardless
+                            // of whether the line is currently visible within the view's
+                            // crop — confirmed via RevitLookup to give the same Z value as
+                            // ViewSpecific when the line IS visible, but unlike
+                            // ViewSpecific, it doesn't silently fail on the increasingly
+                            // tight crops Room_CreateIntElev now produces.
+                            Level roomLevel = doc.GetElement(room.LevelId) as Level;
+                            if (roomLevel != null)
                             {
-                                IList<Curve> curves = level.GetCurvesInView(DatumExtentType.ViewSpecific, v);
-                                if (curves == null || curves.Count == 0) continue;
-
-                                // NOTE: this mixes a LOCAL coordinate (cropCenterY) with what
-                                // GetCurvesInView returns for the level's displayed line — the
-                                // original script did the same subtraction directly. This only
-                                // produces a meaningful distance if the view's local Y and the
-                                // level curve's Z share the same reference (true whenever the
-                                // view's Transform.Origin.Z is 0, which was the case for every
-                                // view we inspected while building the crop-adjustment feature,
-                                // but hasn't been verified specifically for these views — worth
-                                // checking if the alignment looks off in testing).
-                                double levelZ = curves[0].GetEndPoint(0).Z;
-                                dist = (cropCenterY - levelZ) / v.Scale;
-                                foundLevel = true;
-                                break;
+                                IList<Curve> curves = roomLevel.GetCurvesInView(DatumExtentType.Model, v);
+                                if (curves != null && curves.Count > 0)
+                                {
+                                    double levelZ = curves[0].GetEndPoint(0).Z;
+                                    dist = (cropCenterY - levelZ) / v.Scale;
+                                    foundLevel = true;
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -176,7 +212,7 @@ namespace Brand_25
 
                         if (!foundLevel)
                         {
-                            string issue = $"View '{v.Name}': no level found in view for alignment; using dist=0.";
+                            string issue = $"View '{v.Name}': could not determine its room's level line for alignment; using dist=0.";
                             log.AppendLine($"Warning: {issue}");
                             issues.Add(issue);
                         }
