@@ -1,7 +1,9 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace Brand_25
@@ -128,11 +130,16 @@ namespace Brand_25
             Dictionary<TextNoteType, TextNoteType> survivorMap = consolidateDialog.SurvivorSelections;
 
             // ── Step 8: Dialog 4 — confirmation summary ───────────────────────
+            //
+            // NOTE: any redundant type that has EVEN ONE instance inside a group is
+            // entirely excluded from consolidation (not just its grouped instances).
+            // Revit's API does not allow safely reassigning/deleting a type that has
+            // members inside a group without risking corruption of the group, so we
+            // leave those types completely untouched and flag them instead — reported
+            // as "None reassigned" rather than a count, since no work happens on them.
 
-            int totalReassign = 0;
-            int totalInGroups = 0;
-            int totalDelete = survivorMap.Count;
-            var skippedDetails = new List<string>();
+            int totalDeletePreview = 0;
+            int totalSkipPreview = 0;
             var summaryLines = new List<string>();
 
             foreach (var kvp in survivorMap)
@@ -142,18 +149,22 @@ namespace Brand_25
 
                 if (notesByTypeId.TryGetValue(redundant.Id, out var affectedNotes))
                 {
-                    int free = affectedNotes.Count(n => n.GroupId == ElementId.InvalidElementId);
-                    int inGroups = affectedNotes.Count - free;
-                    totalReassign += free;
-                    totalInGroups += inGroups;
+                    bool hasGroupedInstances = affectedNotes.Any(n => n.GroupId != ElementId.InvalidElementId);
 
-                    summaryLines.Add($"  \u2705 {redundant.Name}  \u2192  {survivor.Name}  ({free} reassigned)");
+                    if (hasGroupedInstances)
+                    {
+                        totalSkipPreview++;
+                        summaryLines.Add(
+                            $"  \u26A0 {redundant.Name}  \u2192  {survivor.Name}  (None reassigned \u2014 instance(s) inside a group; type left untouched)");
+                        continue;
+                    }
 
-                    if (inGroups > 0)
-                        skippedDetails.Add($"  \u26A0 {inGroups} \u00D7 \"{redundant.Name}\" inside groups \u2014 manual review needed");
+                    totalDeletePreview++;
+                    summaryLines.Add($"  \u2705 {redundant.Name}  \u2192  {survivor.Name}  ({affectedNotes.Count} reassigned)");
                 }
                 else
                 {
+                    totalDeletePreview++;
                     summaryLines.Add($"  \u2705 {redundant.Name}  \u2192  {survivor.Name}  (0 instances)");
                 }
             }
@@ -161,19 +172,37 @@ namespace Brand_25
             string confirmMessage =
                 $"Ready to consolidate:\n\n" +
                 string.Join("\n", summaryLines) +
-                $"\n\n  \uD83D\uDDD1 {totalDelete} type(s) will be deleted." +
-                (skippedDetails.Any()
-                    ? "\n\nSkipped (inside groups \u2014 resolve manually):\n" + string.Join("\n", skippedDetails)
-                    : "\n\nNo instances inside groups.");
+                $"\n\n  \uD83D\uDDD1 {totalDeletePreview} type(s) will be deleted." +
+                (totalSkipPreview > 0
+                    ? $"\n  \u26A0 {totalSkipPreview} type(s) will be left untouched \u2014 see \"None reassigned\" above."
+                    : "\n  No types will be skipped.");
 
-            var confirmDialog = new Warning("Confirm Consolidation", confirmMessage, credit);
+            var confirmDialog = new WarningLarge("Confirm Consolidation", confirmMessage, credit);
             if (confirmDialog.ShowDialog() != true)
                 return Result.Succeeded;
+
+            // ── Step 8b: Location helper for the glitch log ───────────────────
+            // A TextNote's OwnerViewId is the view it's actually drawn in. Only
+            // report "Sheet:" when that owner view IS a sheet (the note/group sits
+            // directly on the sheet). If it's in a regular view — even one that's
+            // later placed on a sheet via a viewport — report "View:" instead.
+
+            string DescribeLocation(TextNote note)
+            {
+                View ownerView = doc.GetElement(note.OwnerViewId) as View;
+
+                if (ownerView is ViewSheet directSheet)
+                    return $"Sheet: \"{directSheet.SheetNumber} - {directSheet.Name}\"";
+
+                return $"View: \"{(ownerView?.Name ?? "Unknown View")}\"";
+            }
 
             // ── Step 9: Execute — single transaction ──────────────────────────
 
             int reassigned = 0;
-            var actualSkipped = new List<string>();
+            var skippedTypeNames = new List<string>();
+            var glitchLogEntries = new List<string>();
+            var resultLines = new List<string>();
 
             using (Transaction t = new Transaction(doc, "LW_Consolidate Text Note Types"))
             {
@@ -184,54 +213,117 @@ namespace Brand_25
                     TextNoteType redundant = kvp.Key;
                     TextNoteType survivor = kvp.Value;
 
+                    // Capture names up front — once doc.Delete() runs on redundant,
+                    // the object is invalid and reading .Name off it throws
+                    // InvalidObjectException, even just for logging purposes afterward.
+                    string redundantName = redundant.Name;
+                    string survivorName = survivor.Name;
+
                     if (!notesByTypeId.TryGetValue(redundant.Id, out var affectedNotes))
                     {
                         // No instances — delete immediately
                         doc.Delete(redundant.Id);
+                        resultLines.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  (0 instances)");
                         continue;
                     }
 
-                    // 1. Reassign all free instances
-                    foreach (TextNote note in affectedNotes)
+                    var groupedNotes = affectedNotes
+                        .Where(n => n.GroupId != ElementId.InvalidElementId)
+                        .ToList();
+
+                    if (groupedNotes.Any())
                     {
-                        if (note.GroupId == ElementId.InvalidElementId)
+                        // Revit's API cannot safely reassign or delete a type that has
+                        // members inside a group — doing so has been observed to silently
+                        // corrupt/erase the group's content. Leave the type fully intact.
+                        skippedTypeNames.Add(redundantName);
+                        resultLines.Add(
+                            $"  \u26A0 {redundantName}  \u2192  {survivorName}  (None reassigned \u2014 instance(s) inside a group; type left untouched)");
+
+                        var groupInfo = groupedNotes
+                            .Select(n => new
+                            {
+                                GroupId = n.GroupId,
+                                Location = DescribeLocation(n)
+                            })
+                            .Distinct();
+
+                        foreach (var gi in groupInfo)
                         {
-                            note.ChangeTypeId(survivor.Id);
-                            reassigned++;
+                            glitchLogEntries.Add(
+                                $"Type: \"{redundantName}\"   Group ID: {gi.GroupId.Value}   {gi.Location}");
                         }
-                        else
-                        {
-                            actualSkipped.Add($"{redundant.Name} (in group)");
-                        }
+
+                        continue;
                     }
 
-                    // 2. Delete the redundant type — Revit will refuse if instances remain,
-                    //    which only happens for the grouped ones; skip delete in that case
-                    try
+                    // No grouped instances — safe to consolidate normally
+                    foreach (TextNote note in affectedNotes)
                     {
-                        doc.Delete(redundant.Id);
+                        note.ChangeTypeId(survivor.Id);
+                        reassigned++;
                     }
-                    catch
-                    {
-                        // Type still has instances in groups — leave it, report it
-                    }
+
+                    doc.Delete(redundant.Id);
+                    resultLines.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  ({affectedNotes.Count} reassigned)");
                 }
 
                 t.Commit();
+            }
+
+            // ── Step 9b: Write glitch log (if anything was skipped) ───────────
+
+            string logFilePath = null;
+
+            if (glitchLogEntries.Any())
+            {
+                try
+                {
+                    string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    string fileName = $"TextNoteType_Consolidation_Glitches_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt";
+                    logFilePath = Path.Combine(documentsFolder, fileName);
+
+                    var logLines = new List<string>
+                    {
+                        "Text Note Type Consolidation — Glitch Log",
+                        $"Run: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                        $"Project: {doc.Title}",
+                        new string('-', 70),
+                        $"{skippedTypeNames.Distinct().Count()} type(s) skipped because they have instances inside a group:",
+                        ""
+                    };
+                    logLines.AddRange(glitchLogEntries);
+
+                    File.WriteAllLines(logFilePath, logLines);
+                }
+                catch
+                {
+                    // If the log can't be written, still proceed — the in-app warning
+                    // below still tells the user which types were skipped.
+                    logFilePath = null;
+                }
             }
 
             // ── Step 10: Dialog 5 — completion report ─────────────────────────
 
             string completionMessage =
                 $"Consolidation complete.\n\n" +
-                $"  \u2705 {reassigned} TextNote(s) reassigned.\n" +
-                $"  \uD83D\uDDD1 {totalDelete} type(s) processed for deletion." +
-                (actualSkipped.Any()
-                    ? $"\n\n  \u26A0 Skipped \u2014 inside groups (resolve manually):\n" +
-                      string.Join("\n", actualSkipped.Distinct().Select(s => $"      {s}"))
-                    : "\n\n  No instances were skipped.");
+                string.Join("\n", resultLines) +
+                $"\n\n  \u2705 {reassigned} TextNote(s) reassigned in total.\n" +
+                $"  \uD83D\uDDD1 {survivorMap.Count - skippedTypeNames.Count} type(s) deleted.";
 
-            new Warning("Consolidation Complete", completionMessage, credit).ShowDialog();
+            if (skippedTypeNames.Any())
+            {
+                completionMessage +=
+                    $"\n\n  \u26A0 {skippedTypeNames.Distinct().Count()} type(s) left untouched (None reassigned) \u2014 details logged to:\n" +
+                    (logFilePath != null ? $"      {logFilePath}" : "      (log could not be written)");
+            }
+            else
+            {
+                completionMessage += "\n\n  No types were skipped.";
+            }
+
+            new WarningLarge("Consolidation Complete", completionMessage, credit).ShowDialog();
 
             return Result.Succeeded;
         }

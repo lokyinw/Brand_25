@@ -30,6 +30,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Images\elev_on_sheet_32.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Revit 2025 API references. Set Private to false so Revit's own copies are used at runtime. -->
     <Reference Include="RevitAPI">
       <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
@@ -60,6 +64,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\Images\close_32.png" />
+    <EmbeddedResource Include="Resources\Images\elev_on_sheet_32.png" />
     <EmbeddedResource Include="Resources\Images\maximize_32.png" />
     <EmbeddedResource Include="Resources\Images\minimize_32.png" />
     <EmbeddedResource Include="Resources\Images\restore_32.png" />

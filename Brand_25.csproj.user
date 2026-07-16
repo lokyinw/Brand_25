@@ -5,5 +5,8 @@
     <Compile Update="Selection_SheetLayout.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="WarningLarge.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 </Project>

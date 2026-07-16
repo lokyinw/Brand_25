@@ -18,6 +18,13 @@ namespace Brand_25
         private CheckBox _customCheckBox;
         private TextBox _customTextBox;
 
+        // Below this many total items (bullet points + custom-input row, if any),
+        // the checkbox grid stays a single column — a short either/or-style list
+        // (e.g. 2 items) reads far better stacked than side-by-side, and short
+        // lists don't need the two-column layout that longer ones (e.g. the 11
+        // attribute checkboxes in Text_ConsolidateTypes) need to avoid scrolling.
+        private const int TwoColumnThreshold = 5;
+
         public BulletPointSelector(
                 string title,
                 string instruction,
@@ -72,6 +79,11 @@ namespace Brand_25
                     _customCheckBox.Checked += OnSingleSelectionChecked;
                 }
             }
+
+            // Two columns only once there are enough items to benefit from it —
+            // short lists (e.g. a 2-item either/or choice) stay single-column.
+            int totalItems = bulletPoints.Count + (showCustomInput ? 1 : 0);
+            CheckBoxPanel.Columns = totalItems >= TwoColumnThreshold ? 2 : 1;
         }
 
         private void AddCheckBox(string content)

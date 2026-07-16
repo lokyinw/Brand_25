@@ -10,11 +10,11 @@ none
 false
 DEBUG;TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 
-11306714599
+12-416297903
 
-32559907558
+33-175196392
 200-2110274392
-BulletPointSelector.xaml;Consolidate_TextNoteType.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_ElevType.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_ViewPlan.xaml;Warning.xaml;
+BulletPointSelector.xaml;Consolidate_TextNoteType.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_ElevType.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_ViewPlan.xaml;Warning.xaml;WarningLarge.xaml;
 
 False
 

@@ -11,17 +11,47 @@ using Autodesk.Revit.DB;
 
 namespace Brand_25
 {
+    // Unit convention used across this dialog and Elev_PlaceOnSheets.cs:
+    //   - Properties suffixed "Mm"  hold raw human-entered millimeters (paper space).
+    //   - Properties suffixed "Ft"  (computed elsewhere) hold that same paper-space
+    //     value converted to Revit's internal feet via MmToFeet.
+    //   - Properties with NO suffix (e.g. LevelLineTrim) are already in model-space
+    //     Revit internal feet, exactly as the Revit API returns them — no conversion
+    //     is applied. If a value has no suffix, it's model space; if it does, it's
+    //     paper space, in whichever of the two paper units the suffix names.
     public partial class Selection_SheetLayout : Window
     {
         public string SheetNumber { get; private set; }
         public ViewFamilyType SelectedViewFamilyType { get; private set; }
         public Phase SelectedPhase { get; private set; }
-        public double LeftMarginMm { get; private set; }
+
+        // Paper size.
+        public double PaperWidthMm { get; private set; }
+        public double PaperHeightMm { get; private set; }
+
+        // Frame margins: distance from the paper edge to the title frame.
+        public double FrameMarginTopMm { get; private set; }
+        public double FrameMarginBottomMm { get; private set; }
+        public double FrameMarginLeftMm { get; private set; }
+        public double FrameMarginRightMm { get; private set; }
+
+        // Content margins: distance from the title frame to the usable drawing area.
+        // ContentMarginRightMm doubles as the "Drawing Information Area" width, since
+        // on this title block that info block is what actually bounds the drawing
+        // area on the right (it's wider than the frame's own right margin).
+        public double ContentMarginTopMm { get; private set; }
+        public double ContentMarginBottomMm { get; private set; }
+        public double ContentMarginLeftMm { get; private set; }
+        public double ContentMarginRightMm { get; private set; }
+
+        // Viewport layout.
         public double XSpacingMm { get; private set; }
         public double YSpacingMm { get; private set; }
-        public double ReturnWidthMm { get; private set; }
-        public double LowerMarginMm { get; private set; }
-        public double LevelLineScale { get; private set; }
+
+        // Model-space length (Revit internal feet) — see the unit convention note
+        // above. Consumed as-is by the level-line trim formula ported from the
+        // original Dynamo script; not reinterpreted here.
+        public double LevelLineTrim { get; private set; }
 
         public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default")
         {
@@ -35,14 +65,26 @@ namespace Brand_25
             brandLogo.Source = LoadEmbeddedImage("Brand_logo.png");
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
 
-            // Pre-fill defaults matching the original Dynamo script's hardcoded values.
+            // Pre-fill defaults measured from the firm's standard A1 title block.
             SheetNumberBox.Text = "A160";
-            LeftMarginBox.Text = "50";
-            XSpacingBox.Text = "-40";
-            YSpacingBox.Text = "20";
-            ReturnWidthBox.Text = "720";
-            LowerMarginBox.Text = "20";
-            LevelLineScaleBox.Text = "150";
+
+            PaperWidthBox.Text = "841";
+            PaperHeightBox.Text = "594";
+
+            FrameMarginTopBox.Text = "21";
+            FrameMarginBottomBox.Text = "21";
+            FrameMarginLeftBox.Text = "30";
+            FrameMarginRightBox.Text = "21";
+
+            ContentMarginTopBox.Text = "15";
+            ContentMarginBottomBox.Text = "13";
+            ContentMarginLeftBox.Text = "25";
+            ContentMarginRightBox.Text = "100"; // Drawing Information Area width: 841 - 720 - 21
+
+            XSpacingBox.Text = "20";
+            YSpacingBox.Text = "27";
+
+            LevelLineTrimBox.Text = "150";
 
             List<ViewFamilyType> orderedTypes = elevationTypes.OrderBy(t => t.Name).ToList();
             ViewTypeCombo.ItemsSource = orderedTypes;
@@ -78,12 +120,23 @@ namespace Brand_25
                 return true;
             }
 
-            ParseNumber(LeftMarginBox, "Left Margin", out double leftMargin);
+            ParseNumber(PaperWidthBox, "Paper Width", out double paperWidth);
+            ParseNumber(PaperHeightBox, "Paper Height", out double paperHeight);
+
+            ParseNumber(FrameMarginTopBox, "Frame Margin Top", out double frameTop);
+            ParseNumber(FrameMarginBottomBox, "Frame Margin Bottom", out double frameBottom);
+            ParseNumber(FrameMarginLeftBox, "Frame Margin Left", out double frameLeft);
+            ParseNumber(FrameMarginRightBox, "Frame Margin Right", out double frameRight);
+
+            ParseNumber(ContentMarginTopBox, "Content Margin Top", out double contentTop);
+            ParseNumber(ContentMarginBottomBox, "Content Margin Bottom", out double contentBottom);
+            ParseNumber(ContentMarginLeftBox, "Content Margin Left", out double contentLeft);
+            ParseNumber(ContentMarginRightBox, "Drawing Info Area Width", out double contentRight);
+
             ParseNumber(XSpacingBox, "X Spacing", out double xSpacing);
             ParseNumber(YSpacingBox, "Y Spacing", out double ySpacing);
-            ParseNumber(ReturnWidthBox, "Return Width", out double returnWidth);
-            ParseNumber(LowerMarginBox, "Lower Margin", out double lowerMargin);
-            ParseNumber(LevelLineScaleBox, "Level Line Trim", out double levelLineScale);
+
+            ParseNumber(LevelLineTrimBox, "Level Line Trim", out double levelLineTrim);
 
             if (problems.Count > 0)
             {
@@ -95,12 +148,24 @@ namespace Brand_25
             SheetNumber = SheetNumberBox.Text.Trim();
             SelectedViewFamilyType = ViewTypeCombo.SelectedItem as ViewFamilyType;
             SelectedPhase = PhaseCombo.SelectedItem as Phase;
-            LeftMarginMm = leftMargin;
+
+            PaperWidthMm = paperWidth;
+            PaperHeightMm = paperHeight;
+
+            FrameMarginTopMm = frameTop;
+            FrameMarginBottomMm = frameBottom;
+            FrameMarginLeftMm = frameLeft;
+            FrameMarginRightMm = frameRight;
+
+            ContentMarginTopMm = contentTop;
+            ContentMarginBottomMm = contentBottom;
+            ContentMarginLeftMm = contentLeft;
+            ContentMarginRightMm = contentRight;
+
             XSpacingMm = xSpacing;
             YSpacingMm = ySpacing;
-            ReturnWidthMm = returnWidth;
-            LowerMarginMm = lowerMargin;
-            LevelLineScale = levelLineScale;
+
+            LevelLineTrim = levelLineTrim;
 
             this.DialogResult = true;
         }

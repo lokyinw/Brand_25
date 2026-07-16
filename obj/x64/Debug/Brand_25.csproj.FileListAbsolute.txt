@@ -71,3 +71,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Brand_25.pdb
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\ref\Brand_25.dll
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_SheetLayout.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_SheetLayout.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\WarningLarge.baml
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\WarningLarge.g.cs

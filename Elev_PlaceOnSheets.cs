@@ -11,32 +11,57 @@ using System.Text.RegularExpressions;
 
 namespace Brand_25
 {
-    // Places a sorted set
-    // of internal elevation views onto a sheet in left-to-right rows, wrapping to a new
-    // row when the running width exceeds the configured Return Width, and creating an
-    // additional sheet (duplicating the title block, incrementing sheet number/name,
-    // copying BA_SheetSeries, setting BA_SRT_Level 01) when a row would run below the
-    // configured Lower Margin.
+    // Places a sorted set of internal elevation views onto a sheet in left-to-right
+    // rows, wrapping to a new row when the running width exceeds the content area's
+    // right edge, and creating an additional sheet (duplicating the title block,
+    // incrementing sheet number/name, copying BA_SheetSeries, setting BA_SRT_Level 01)
+    // when a row would run below the content area's bottom edge.
+    //
+    // Unit convention used throughout this file (matches Selection_SheetLayout):
+    //   - Variables suffixed "Mm" are raw millimeters, straight from the dialog.
+    //   - Variables suffixed "Ft" are paper-space lengths in Revit's internal feet,
+    //     i.e. an "Mm" value run through MmToFeet.
+    //   - Variables with NO suffix are model-space lengths, already in Revit's
+    //     internal feet exactly as the API returns them (e.g. CropBox, level
+    //     geometry) — no conversion applied.
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
     public class Elev_PlaceOnSheets : IExternalCommand
     {
         // 1 ft = 304.8 mm.
         private const double MmToFeet = 0.0032808;
+        private const double FeetToMm = 304.8;
 
-        // A1 landscape paper height, and the title block's own top margins, in mm —
-        // carried over from the original script. If your title block isn't A1, or its
-        // margins differ, these three constants are the ones to adjust.
-        private const double PaperHeightMm = 594.0;
-        private const double TopMarginMm = 21.0;
-        private const double TopMarginBMm = 15.0;
+        // --- Empirical compensation constants ------------------------------------
+        // Viewport.SetBoxCenter() positions the crop+title envelope, not the crop
+        // itself, and the exact envelope-to-crop offset has proven inconsistent to
+        // pin down exactly (it didn't match a single clean formula in testing — some
+        // other factor we haven't isolated yet is contributing). Rather than chase
+        // the exact mechanism further, these two constants are plain fudge factors,
+        // tuned from live test measurements, applied on top of the dialog's own
+        // margin/spacing inputs. If a future test shows drift, adjust these numbers
+        // directly — no other code should need to change.
+        //
+        //   TopMarginCompensationMm: measured top margin ran ~53.5mm vs. an intended
+        //   15mm (ContentMarginTopMm) — i.e. about 38.5mm too generous. Added to the
+        //   top-of-sheet reference so the placed crop sits higher (smaller margin).
+        private const double TopMarginCompensationMm = 38.5;
+
+        //   YSpacingCompensationMm: measured row-to-row gap ran ~60-68mm against a
+        //   YSpacingMm of 27 — roughly 33-41mm too generous, averaging ~37mm.
+        //   Subtracted from YSpacingMm before use, so entering 27 lands closer to an
+        //   actual 27mm gap. Because the real offset varies row to row (~8mm swing
+        //   observed), this won't be exact every time — it's a "close enough"
+        //   correction, not a precise one.
+        private const double YSpacingCompensationMm = -37.0;
+        // ---------------------------------------------------------------------------
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-07-14. Beta 0.10";
+            string credit = "Last Modified by Lok on 2026-07-16. Beta 0.11";
 
             StringBuilder log = new StringBuilder();
             List<string> issues = new List<string>();
@@ -82,6 +107,21 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
+                // Derive the content area's four edges (paper space, feet) from paper
+                // size + frame margin (paper edge -> title frame) + content margin
+                // (title frame -> drawing area). ContentMarginRightMm doubles as the
+                // "Drawing Information Area" width, since that's what actually bounds
+                // the drawing area on the right for this title block. Changing to a
+                // different title block or paper size only ever means changing these
+                // eight dialog inputs — nothing below this point needs to change.
+                double leftEdgeFt = (inputWindow.FrameMarginLeftMm + inputWindow.ContentMarginLeftMm) * MmToFeet;
+                double rightEdgeFt = (inputWindow.PaperWidthMm - inputWindow.FrameMarginRightMm - inputWindow.ContentMarginRightMm) * MmToFeet;
+                double topOfSheetFt = (inputWindow.PaperHeightMm - inputWindow.FrameMarginTopMm - inputWindow.ContentMarginTopMm + TopMarginCompensationMm) * MmToFeet;
+                double lowerEdgeFt = (inputWindow.FrameMarginBottomMm + inputWindow.ContentMarginBottomMm) * MmToFeet;
+
+                double xSpacingFt = inputWindow.XSpacingMm * MmToFeet;
+                double ySpacingFt = (inputWindow.YSpacingMm + YSpacingCompensationMm) * MmToFeet;
+
                 // Step 3: collect matching elevation views (exact type + phase match,
                 // rather than the original script's substring match on a parameter string —
                 // this is more robust since it can't accidentally match an unrelated view
@@ -124,7 +164,6 @@ namespace Brand_25
                         return v.Name.StartsWith($"{r.Number} {roomName} - ");
                     });
 
-                    //Room matchedRoom = allRooms.FirstOrDefault(r => v.Name.StartsWith($"{r.Number} {r.Name} - "));
                     if (matchedRoom == null)
                     {
                         string issue = $"View '{v.Name}': doesn't match any room's naming pattern (not created by Room_CreateIntElev?) — skipped.";
@@ -146,92 +185,90 @@ namespace Brand_25
                 elevationViews = matchedViews.Select(m => m.View).ToList();
                 List<Room> matchedRooms = matchedViews.Select(m => m.Room).ToList();
 
-                // Step 5: measurement pass. Each view is temporarily placed on the starting
-                // sheet purely to read its rendered viewport size and its "dist" (the
-                // vertical offset needed to align that view's Level line consistently
-                // across all viewports), then removed. This can't be computed from the
-                // crop box alone since it depends on how Revit actually renders the
-                // viewport's content at that view's scale.
-                List<double> widths = new List<double>();
-                List<double> heights = new List<double>();
-                List<double> dists = new List<double>();
+                // Step 5: measurement pass. Reads each view's crop box (paper space, via
+                // CropBox / view.Scale) and its Room's Level line position. This is a
+                // read-only pass over the View/Level/Room API — no Viewport instance or
+                // transaction is needed. The gap between this and what actually lands on
+                // paper is handled by the flat TopMarginCompensationMm / YSpacingCompensationMm
+                // constants above, rather than by measuring per-view here.
+                List<double> widthsFt = new List<double>();
+                List<double> heightsFt = new List<double>();
+                List<double> distsFt = new List<double>();
 
-                using (Transaction measureTrans = new Transaction(doc, "LW_Measure Elevation Viewports"))
+                log.AppendLine();
+                log.AppendLine("=== Measurement Data (tab-separated; paste into Excel) ===");
+                log.AppendLine(string.Join("\t",
+                    "ViewName", "RoomNumber", "ViewScale",
+                    "CropMinX_model_mm", "CropMaxX_model_mm", "CropMinY_model_mm", "CropMaxY_model_mm",
+                    "CropWidth_mm", "CropHeight_mm",
+                    "LevelName", "LevelZ_model_mm", "CropCenterY_model_mm", "Dist_mm"));
+
+                for (int i = 0; i < elevationViews.Count; i++)
                 {
-                    measureTrans.Start();
+                    View v = elevationViews[i];
+                    Room room = matchedRooms[i];
 
-                    for (int i = 0; i < elevationViews.Count; i++)
+                    BoundingBoxXYZ cropBox = v.CropBox;
+                    double cropWidth = cropBox.Max.X - cropBox.Min.X;   // model space
+                    double cropHeight = cropBox.Max.Y - cropBox.Min.Y;  // model space
+                    double viewScale = v.Scale;
+
+                    widthsFt.Add(cropWidth / viewScale);
+                    heightsFt.Add(cropHeight / viewScale);
+
+                    double dist = 0;
+                    bool foundLevel = false;
+                    double cropCenterY = (cropBox.Min.Y + cropBox.Max.Y) / 2.0;
+                    Level roomLevel = null;
+                    double levelZ = 0;
+                    try
                     {
-                        View v = elevationViews[i];
-                        Room room = matchedRooms[i];
+                        // View.CropBox is in the view's own LOCAL coordinate system,
+                        // where Y is vertical.
 
-                        Viewport vp = Viewport.Create(doc, startingSheet.Id, v.Id, XYZ.Zero);
-                        if (vp == null)
+                        // Use the room's OWN level directly, rather than "whichever
+                        // level happens to be visible in this view first".
+                        roomLevel = doc.GetElement(room.LevelId) as Level;
+                        if (roomLevel != null)
                         {
-                            string issue = $"View '{v.Name}': failed to create a measurement viewport.";
-                            log.AppendLine($"Error: {issue}");
-                            issues.Add(issue);
-                            widths.Add(0);
-                            heights.Add(0);
-                            dists.Add(0);
-                            continue;
-                        }
-
-                        Outline outline = vp.GetBoxOutline();
-                        widths.Add(outline.MaximumPoint.X);
-                        heights.Add(outline.MaximumPoint.Y);
-
-                        double dist = 0;
-                        bool foundLevel = false;
-                        try
-                        {
-                            // View.CropBox is in the view's own LOCAL coordinate system,
-                            // where Y is vertical
-                            BoundingBoxXYZ cropBox = v.CropBox;
-                            double cropCenterY = (cropBox.Min.Y + cropBox.Max.Y) / 2.0;
-
-                            // Use the room's OWN level directly
-                            Level roomLevel = doc.GetElement(room.LevelId) as Level;
-                            if (roomLevel != null)
+                            IList<Curve> curves = roomLevel.GetCurvesInView(DatumExtentType.Model, v);
+                            if (curves != null && curves.Count > 0)
                             {
-                                IList<Curve> curves = roomLevel.GetCurvesInView(DatumExtentType.Model, v);
-                                if (curves != null && curves.Count > 0)
-                                {
-                                    double levelZ = curves[0].GetEndPoint(0).Z;
-                                    dist = (cropCenterY - levelZ) / v.Scale;
-                                    foundLevel = true;
-                                }
+                                levelZ = curves[0].GetEndPoint(0).Z;
+                                dist = (cropCenterY - levelZ) / viewScale;
+                                foundLevel = true;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            log.AppendLine($"Error measuring level offset for view '{v.Name}': {ex.Message}");
-                        }
-
-                        if (!foundLevel)
-                        {
-                            string issue = $"View '{v.Name}': could not determine its room's level line for alignment; using dist=0.";
-                            log.AppendLine($"Warning: {issue}");
-                            issues.Add(issue);
-                        }
-                        dists.Add(dist);
-
-                        doc.Delete(vp.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.AppendLine($"Error measuring level offset for view '{v.Name}': {ex.Message}");
                     }
 
-                    measureTrans.Commit();
+                    if (!foundLevel)
+                    {
+                        string issue = $"View '{v.Name}': could not determine its room's level line for alignment; using dist=0.";
+                        log.AppendLine($"Warning: {issue}");
+                        issues.Add(issue);
+                    }
+                    distsFt.Add(dist);
+
+                    log.AppendLine(string.Join("\t",
+                        v.Name, room.Number, viewScale.ToString(),
+                        (cropBox.Min.X * FeetToMm).ToString("F3"), (cropBox.Max.X * FeetToMm).ToString("F3"),
+                        (cropBox.Min.Y * FeetToMm).ToString("F3"), (cropBox.Max.Y * FeetToMm).ToString("F3"),
+                        (cropWidth / viewScale * FeetToMm).ToString("F3"), (cropHeight / viewScale * FeetToMm).ToString("F3"),
+                        roomLevel?.Name ?? "N/A", (levelZ * FeetToMm).ToString("F3"),
+                        (cropCenterY * FeetToMm).ToString("F3"), (dist * FeetToMm).ToString("F3")));
                 }
 
                 // Step 6: layout algorithm — pack views into rows left-to-right, wrapping
-                // to a new row when the running width would exceed Return Width, and
-                // marking a new sheet when a row would fall below Lower Margin.
+                // to a new row when the running width would exceed the content area's
+                // right edge, and marking a new sheet when a row would fall below the
+                // content area's bottom edge.
                 LayoutResult layout = ComputeLayout(
-                    widths, heights, dists,
-                    inputWindow.LeftMarginMm * MmToFeet,
-                    inputWindow.XSpacingMm * MmToFeet,
-                    inputWindow.YSpacingMm * MmToFeet,
-                    inputWindow.ReturnWidthMm * MmToFeet,
-                    inputWindow.LowerMarginMm * MmToFeet);
+                    widthsFt, heightsFt, distsFt,
+                    leftEdgeFt, xSpacingFt, ySpacingFt, rightEdgeFt, topOfSheetFt, lowerEdgeFt);
 
                 // Step 7: create any additional sheets the layout needs.
                 List<ViewSheet> sheetList = new List<ViewSheet> { startingSheet };
@@ -268,6 +305,15 @@ namespace Brand_25
                 // Step 8: place the real viewports at their computed positions.
                 int placedCount = 0;
                 List<int> placedIndices = new List<int>();
+
+                log.AppendLine();
+                log.AppendLine("=== Placement Data (tab-separated; paste into Excel) ===");
+                log.AppendLine(string.Join("\t",
+                    "ViewName", "SheetIndex", "SheetNumber", "IsRowEnd",
+                    "TargetX_mm", "TargetY_mm",
+                    "EnvelopeMinX_mm", "EnvelopeMaxX_mm", "EnvelopeMinY_mm", "EnvelopeMaxY_mm",
+                    "LabelMinX_mm", "LabelMaxX_mm", "LabelMinY_mm", "LabelMaxY_mm"));
+
                 using (Transaction placeTrans = new Transaction(doc, "LW_Place Elevations on Sheet"))
                 {
                     placeTrans.Start();
@@ -295,6 +341,21 @@ namespace Brand_25
                         vp.SetBoxCenter(new XYZ(layout.PlaceX[i], layout.PlaceY[i], 0));
                         placedCount++;
                         placedIndices.Add(i);
+
+                        // Log the ACTUAL resulting geometry, post-placement, in sheet
+                        // (paper) space — this is the ground truth to compare against
+                        // physical sheet measurements.
+                        Outline placedEnvelope = vp.GetBoxOutline();
+                        Outline placedLabel = vp.GetLabelOutline();
+                        log.AppendLine(string.Join("\t",
+                            elevationViews[i].Name, sheetIndex.ToString(), sheetList[sheetIndex].SheetNumber, layout.IsRowEnd[i].ToString(),
+                            (layout.PlaceX[i] * FeetToMm).ToString("F3"), (layout.PlaceY[i] * FeetToMm).ToString("F3"),
+                            (placedEnvelope.MinimumPoint.X * FeetToMm).ToString("F3"), (placedEnvelope.MaximumPoint.X * FeetToMm).ToString("F3"),
+                            (placedEnvelope.MinimumPoint.Y * FeetToMm).ToString("F3"), (placedEnvelope.MaximumPoint.Y * FeetToMm).ToString("F3"),
+                            placedLabel != null ? (placedLabel.MinimumPoint.X * FeetToMm).ToString("F3") : "N/A",
+                            placedLabel != null ? (placedLabel.MaximumPoint.X * FeetToMm).ToString("F3") : "N/A",
+                            placedLabel != null ? (placedLabel.MinimumPoint.Y * FeetToMm).ToString("F3") : "N/A",
+                            placedLabel != null ? (placedLabel.MaximumPoint.Y * FeetToMm).ToString("F3") : "N/A"));
                     }
 
                     placeTrans.Commit();
@@ -319,7 +380,7 @@ namespace Brand_25
                         Parameter titleParam = v.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
                         titleParam?.Set($"{room.Number} {room.Name}");
 
-                        UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelLineScale, log, issues);
+                        UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelLineTrim, log, issues);
                     }
 
                     titleTrans.Commit();
@@ -365,7 +426,9 @@ namespace Brand_25
         // level's line, and — only when this view ends its row — leaves the RIGHT-hand
         // bubble visible, so the row still visually indicates which floor it belongs to.
         // Translated from a Dynamo Python node the team already relies on; the trim
-        // formula (scale / view.Scale) is kept exactly as-is rather than reinterpreted.
+        // formula (lineScale / view.Scale) is kept exactly as-is rather than
+        // reinterpreted — lineScale is a model-space length (no suffix), consumed
+        // directly here without unit conversion, same as the original script.
         private void UpdateLevelDisplay(Document doc, View view, bool isRowEnd, double lineScale, StringBuilder log, List<string> issues)
         {
             List<Level> levelsInView = new FilteredElementCollector(doc, view.Id)
@@ -467,28 +530,19 @@ namespace Brand_25
             public int MaxSheetIndex;
         }
 
-        // Faithful translation of the original "Place Views on Sheet" packing algorithm:
-        // views are added left-to-right; when the next view wouldn't fit within
-        // returnWidthFt, the current row is finalized (vertically aligned so every view's
-        // Level line lines up) and a new row starts. If a row's aligned position would
-        // fall below lowerMarginFt from the bottom of the sheet, a new sheet is used
-        // instead and the row starts again from the top.
-        private LayoutResult ComputeLayout(List<double> widths, List<double> heights, List<double> dists,
-            double leftMarginFt, double xSpacingFt, double ySpacingFt, double returnWidthFt, double lowerMarginFt)
+        // Packs views into rows left-to-right using an EXPLICIT half-width formula
+        // (half of the current view + spacing + half of the next view), so
+        // xSpacingFt has its literal meaning: the paper-space gap between two
+        // viewports' crop edges. A row wraps to a new one when the next view's
+        // right edge would cross rightEdgeFt. Once a row is complete, it's aligned
+        // so every view's Level line lines up (using each view's own dist); if that
+        // aligned position would fall below lowerEdgeFt, the row instead starts a
+        // new sheet from topOfSheetFt.
+        private LayoutResult ComputeLayout(List<double> widthsFt, List<double> heightsFt, List<double> distsFt,
+            double leftEdgeFt, double xSpacingFt, double ySpacingFt, double rightEdgeFt, double topOfSheetFt, double lowerEdgeFt)
         {
-            double placeY = (PaperHeightMm - TopMarginMm - TopMarginBMm) * MmToFeet;
-            double placeX = leftMarginFt - xSpacingFt;
-            double topOfSheetY = (PaperHeightMm - TopMarginMm - TopMarginBMm) * MmToFeet;
-
-            double prevWidth = 0;
-            List<double> rowHeights = new List<double>();
-            List<double> rowDists = new List<double>();
-            int sheetIndex = 0;
-
             LayoutResult result = new LayoutResult();
-            // Pre-size the output lists so we can assign by index in any order, matching
-            // the original script's index bookkeeping.
-            for (int i = 0; i < widths.Count; i++)
+            for (int i = 0; i < widthsFt.Count; i++)
             {
                 result.PlaceX.Add(0);
                 result.PlaceY.Add(0);
@@ -496,72 +550,68 @@ namespace Brand_25
                 result.IsRowEnd.Add(false);
             }
 
-            void FinalizeRow(int lastIndexInRow, int rowStartIndex)
+            double placeX = leftEdgeFt;
+            double placeY = topOfSheetFt;
+            double prevHalfWidth = 0;
+            bool rowHasItems = false;
+            int sheetIndex = 0;
+            int rowStart = 0;
+
+            List<double> rowHeights = new List<double>();
+            List<double> rowDists = new List<double>();
+
+            void FinalizeRow(int rowStartIndex, int rowEndIndex)
             {
                 double alignY = placeY - rowHeights.Max() - rowDists.Max();
 
-                if (alignY < lowerMarginFt)
+                if (alignY < lowerEdgeFt)
                 {
                     sheetIndex++;
-                    placeY = topOfSheetY;
+                    placeY = topOfSheetFt;
                     alignY = placeY - rowHeights.Max() - rowDists.Max();
                 }
 
-                for (int i = 0; i < rowHeights.Count; i++)
+                for (int i = rowStartIndex; i <= rowEndIndex; i++)
                 {
-                    int index = rowStartIndex + i;
-                    double y = alignY + dists[index];
-                    result.PlaceY[index] = y;
-                    result.PlaceSheetIndex[index] = sheetIndex;
+                    result.PlaceY[i] = alignY + distsFt[i];
+                    result.PlaceSheetIndex[i] = sheetIndex;
                 }
+                result.IsRowEnd[rowEndIndex] = true;
 
-                result.IsRowEnd[rowStartIndex + rowHeights.Count - 1] = true;
+                // Next row starts below whichever view in this row extends furthest down.
+                placeY = result.PlaceY[rowEndIndex] - distsFt[rowEndIndex] - ySpacingFt;
 
-                //int lastIndex = rowStartIndex + rowHeights.Count - 1;
-                //placeY = result.PlaceY[lastIndex];
+                rowHeights.Clear();
+                rowDists.Clear();
             }
 
-            int currentRowStart = 0;
-
-            for (int ind = 0; ind < widths.Count; ind++)
+            for (int i = 0; i < widthsFt.Count; i++)
             {
-                double vX = widths[ind];
+                double halfWidth = widthsFt[i] / 2.0;
 
-                if (placeX + prevWidth + xSpacingFt + vX + vX < returnWidthFt)
+                placeX = rowHasItems
+                    ? placeX + prevHalfWidth + xSpacingFt + halfWidth  // half-current + gap + half-next
+                    : leftEdgeFt + halfWidth;                          // first item in row: flush to left edge
+
+                if (rowHasItems && placeX + halfWidth > rightEdgeFt)
                 {
-                    // Fits in the current row.
-                    placeX = placeX + prevWidth + xSpacingFt + vX;
-                    result.PlaceX[ind] = placeX;
-                    prevWidth = vX;
-                    rowHeights.Add(heights[ind]);
-                    rowDists.Add(dists[ind]);
-
-                    if (ind == widths.Count - 1)
-                    {
-                        FinalizeRow(ind, currentRowStart);
-                    }
+                    // Doesn't fit — finalize the row accumulated so far, then start a
+                    // new row with the current view.
+                    FinalizeRow(rowStart, i - 1);
+                    rowStart = i;
+                    rowHasItems = false;
+                    placeX = leftEdgeFt + halfWidth;
                 }
-                else
+
+                result.PlaceX[i] = placeX;
+                rowHeights.Add(heightsFt[i]);
+                rowDists.Add(distsFt[i]);
+                prevHalfWidth = halfWidth;
+                rowHasItems = true;
+
+                if (i == widthsFt.Count - 1)
                 {
-                    // Doesn't fit — finalize the row accumulated so far...
-                    FinalizeRow(ind - 1, currentRowStart);
-                    placeY = (result.PlaceY[ind - 1]) - dists[ind - 1] - ySpacingFt; // set placeY for next row, relative to the row just finalized
-
-                    // ...then start a new row with the current view.
-                    rowHeights.Clear();
-                    rowDists.Clear();
-                    currentRowStart = ind;
-
-                    prevWidth = vX;
-                    placeX = leftMarginFt + vX;
-                    result.PlaceX[ind] = placeX;
-                    rowHeights.Add(heights[ind]);
-                    rowDists.Add(dists[ind]);
-
-                    if (ind == widths.Count - 1)
-                    {
-                        FinalizeRow(ind, currentRowStart);
-                    }
+                    FinalizeRow(rowStart, i);
                 }
             }
 

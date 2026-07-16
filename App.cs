@@ -60,7 +60,7 @@ namespace Brand_25
             PushButtonData btnData3c = new PushButtonData("btn3c", "Place Elev\non Sheet", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_PlaceOnSheets");
             btnData3a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Room_Re-center_32.png");
             btnData3b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.intelev_32.png");
-            btnData3c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData3c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.elev_on_sheet_32.png"); // swap for a real icon
             btnData3a.ToolTip = "Relocate the Room insertion point to the centre of the room";
             btnData3b.ToolTip = "Create internal elevations for selected rooms";
             btnData3c.ToolTip = "Place internal elevation views onto a sheet in a row-packed layout, creating additional sheets as needed.";
@@ -90,13 +90,13 @@ namespace Brand_25
             // Control-test panel: standalone, unrelated to the main workflow. Remove once
             // the GetCropShape/SetCropShape investigation is finished.
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
-            PushButtonData btnDataTestCrop = new PushButtonData("btnTestCrop", "Test Crop\nShape Adjust", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_TestCropShapeAdjust");
+            //PushButtonData btnDataTestCrop = new PushButtonData("btnTestCrop", "Test Crop\nShape Adjust", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_TestCropShapeAdjust");
             PushButtonData btnDataTestc = new PushButtonData("btn4c", "Consolidate\nTypes", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
-            btnDataTestCrop.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            //btnDataTestCrop.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnDataTestc.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            btnDataTestCrop.ToolTip = "CONTROL TEST: lowers the active elevation/section view's crop shape top by 2 feet via GetCropShape/SetCropShape, done as a standalone action on an already-existing view. Reports success or the exact exception.";
+            //btnDataTestCrop.ToolTip = "CONTROL TEST: lowers the active elevation/section view's crop shape top by 2 feet via GetCropShape/SetCropShape, done as a standalone action on an already-existing view. Reports success or the exact exception.";
             btnDataTestc.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
-            panelTest.AddItem(btnDataTestCrop);
+            //panelTest.AddItem(btnDataTestCrop);
             panelTest.AddItem(btnDataTestc);
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");

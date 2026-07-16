@@ -3,20 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -38,33 +34,59 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Room_CreateIntElev.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
-              "RelativeDocumentMoniker": "Room_CreateIntElev.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
-              "RelativeToolTip": "Room_CreateIntElev.cs",
-              "ViewState": "AgIAAGcCAAAAAAAAAAAowG8CAAAJAAAAAAAAAA==",
+              "DocumentIndex": 2,
+              "Title": "Elev_PlaceOnSheets.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
+              "RelativeDocumentMoniker": "Elev_PlaceOnSheets.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
+              "RelativeToolTip": "Elev_PlaceOnSheets.cs",
+              "ViewState": "AgIAAJYCAAAAAAAAAADwv7ICAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-15T12:31:48.067Z",
+              "WhenOpened": "2026-07-16T05:18:54.241Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
+              "Title": "Brand_25",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
+              "RelativeDocumentMoniker": "Brand_25.csproj",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
+              "RelativeToolTip": "Brand_25.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-07-16T01:44:29.098Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "App.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
+              "RelativeDocumentMoniker": "App.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
+              "RelativeToolTip": "App.cs",
+              "ViewState": "AgIAAFgAAAAAAAAAAAAcwGIAAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-16T01:43:41.221Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
               "Title": "Selection_SheetLayout.xaml.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml.cs",
               "RelativeDocumentMoniker": "Selection_SheetLayout.xaml.cs",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml.cs",
               "RelativeToolTip": "Selection_SheetLayout.xaml.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFwAAAANAAAAAAAAAA==",
+              "ViewState": "AgIAAMgAAAAAAAAAAAAkwOMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-15T06:31:55.077Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 1,
               "Title": "Selection_SheetLayout.xaml",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml",
               "RelativeDocumentMoniker": "Selection_SheetLayout.xaml",
@@ -73,43 +95,6 @@
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
               "WhenOpened": "2026-07-15T06:31:45.181Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "Elev_PlaceOnSheets.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
-              "RelativeDocumentMoniker": "Elev_PlaceOnSheets.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
-              "RelativeToolTip": "Elev_PlaceOnSheets.cs",
-              "ViewState": "AgIAAGUCAAAAAAAAAAAIwIACAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-14T08:28:20.096Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "Brand_25.csproj",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
-              "RelativeDocumentMoniker": "Brand_25.csproj",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
-              "RelativeToolTip": "Brand_25.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFYAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-07-13T08:42:55.392Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "App.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeDocumentMoniker": "App.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeToolTip": "App.cs",
-              "ViewState": "AgIAADEAAAAAAAAAAAAqwEIAAAAmAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-12T13:35:56.8Z"
             }
           ]
         }
