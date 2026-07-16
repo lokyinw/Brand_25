@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Brand_25.Selection_SheetLayout"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Place Internal Elevations on Sheet" Height="700" Width="500" WindowStartupLocation="CenterScreen"
+        Title="Place Internal Elevations on Sheet" Height="810" Width="500" WindowStartupLocation="CenterScreen"
         Background="LightGray" WindowStyle="None">
 
     <WindowChrome.WindowChrome>
@@ -93,18 +93,18 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="20 15 20 0">
 
-                <TextBlock Text="Starting Sheet" Style="{StaticResource LabelStyle}" FontSize="16" Margin="0 0 0 4"/>
-                <TextBox x:Name="SheetNumberBox" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 16"/>
+                <TextBlock Text="Starting Sheet" Style="{StaticResource LabelStyle}" FontSize="14" Margin="0 0 0 4"/>
+                <TextBox x:Name="SheetNumberBox" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 6"/>
 
-                <TextBlock Text="Elevation View Type" Style="{StaticResource LabelStyle}" FontSize="16" Margin="0 0 0 4"/>
-                <ComboBox x:Name="ViewTypeCombo" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 16" DisplayMemberPath="Name"/>
+                <TextBlock Text="Elevation View Type" Style="{StaticResource LabelStyle}" FontSize="14" Margin="0 0 0 4"/>
+                <ComboBox x:Name="ViewTypeCombo" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 6" DisplayMemberPath="Name"/>
 
-                <TextBlock Text="Phase" Style="{StaticResource LabelStyle}" FontSize="16" Margin="0 0 0 4"/>
-                <ComboBox x:Name="PhaseCombo" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 16" DisplayMemberPath="Name"/>
+                <TextBlock Text="Phase" Style="{StaticResource LabelStyle}" FontSize="14" Margin="0 0 0 4"/>
+                <ComboBox x:Name="PhaseCombo" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 6" DisplayMemberPath="Name"/>
 
                 <!-- Paper -->
-                <TextBlock Text="Paper Size" Style="{StaticResource SectionHeaderStyle}"/>
-                <Grid Margin="0 0 0 16">
+                <TextBlock Text="Paper Size" Style="{StaticResource SectionHeaderStyle}" Margin="0 50 0 4"/>
+                <Grid Margin="0 0 0 20">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -120,6 +120,7 @@
                 </Grid>
 
                 <!-- Frame margins: paper edge -> title frame -->
+                <!--
                 <TextBlock Text="Frame Margins (paper edge → title frame)" Style="{StaticResource SectionHeaderStyle}"/>
                 <Grid Margin="0 0 0 8">
                     <Grid.ColumnDefinitions>
@@ -149,9 +150,44 @@
                         <TextBox x:Name="FrameMarginRightBox" Style="{StaticResource InputFontStyle}" Height="26"/>
                     </StackPanel>
                 </Grid>
+                -->
+
+                <TextBlock Text="Frame Margins (paper edge → title frame)" Style="{StaticResource SectionHeaderStyle}" Margin="0 35 0 4"/>
+                <Grid Margin="0 0 0 10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Top Margin -->
+                    <StackPanel Grid.Column="0" Margin="0 0 10 0">
+                        <TextBlock Text="Top (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="FrameMarginTopBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Bottom Margin -->
+                    <StackPanel Grid.Column="1" Margin="0 0 10 0">
+                        <TextBlock Text="Bottom (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="FrameMarginBottomBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Left Margin -->
+                    <StackPanel Grid.Column="2" Margin="0 0 10 0">
+                        <TextBlock Text="Left (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="FrameMarginLeftBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Right Margin -->
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Right (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="FrameMarginRightBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Content margins: title frame -> drawing area -->
-                <TextBlock Text="Content Margins (title frame → drawing area)" Style="{StaticResource SectionHeaderStyle}"/>
+                <!--<TextBlock Text="Content Margins (title frame → drawing area)" Style="{StaticResource SectionHeaderStyle}"/>
                 <Grid Margin="0 0 0 8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -179,11 +215,45 @@
                         <TextBlock Text="Drawing Info Area Width (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
                         <TextBox x:Name="ContentMarginRightBox" Style="{StaticResource InputFontStyle}" Height="26"/>
                     </StackPanel>
+                </Grid>-->
+
+                <TextBlock Text="Content Margins (title frame → drawing area)" Style="{StaticResource SectionHeaderStyle}" Margin="0 0 0 4"/>
+                <Grid Margin="0 0 0 50">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Top Margin -->
+                    <StackPanel Grid.Column="0" Margin="0 0 10 0">
+                        <TextBlock Text="Top (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="ContentMarginTopBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Bottom Margin -->
+                    <StackPanel Grid.Column="1" Margin="0 0 10 0">
+                        <TextBlock Text="Bottom (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="ContentMarginBottomBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Left Margin -->
+                    <StackPanel Grid.Column="2" Margin="0 0 10 0">
+                        <TextBlock Text="Left (mm)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="ContentMarginLeftBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
+
+                    <!-- Drawing Info Area Width -->
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Title block Width" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
+                        <TextBox x:Name="ContentMarginRightBox" Style="{StaticResource InputFontStyle}" Height="26"/>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Viewport layout -->
-                <TextBlock Text="Viewport Layout" Style="{StaticResource SectionHeaderStyle}"/>
-                <Grid Margin="0 0 0 8">
+                <TextBlock Text="Viewport Layout" Style="{StaticResource SectionHeaderStyle}" Margin="0 10 0 4"/>
+                <Grid Margin="0 0 0 10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -199,9 +269,9 @@
                 </Grid>
 
                 <!-- Level lines -->
-                <TextBlock Text="Level Lines" Style="{StaticResource SectionHeaderStyle}"/>
-                <TextBlock Text="Level Line Trim (model-space length)" Style="{StaticResource LabelStyle}" Margin="0 0 0 4"/>
-                <TextBox x:Name="LevelLineTrimBox" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 16"/>
+                <!-- <TextBlock Text="Level Lines" Style="{StaticResource SectionHeaderStyle}" Margin="0 10 0 4"/> -->
+                <TextBlock Text="Level Extension beyond crop box (mm)" Style="{StaticResource SectionHeaderStyle}" Margin="0 0 0 4"/>
+                <TextBox x:Name="LevelExtensionBox" Style="{StaticResource InputFontStyle}" Height="26" Margin="0 0 0 16"/>
 
                 <TextBlock x:Name="ErrorText" Foreground="Red" Style="{StaticResource CustomFontStyle}" FontSize="13"
                        TextWrapping="Wrap" Visibility="Collapsed"/>

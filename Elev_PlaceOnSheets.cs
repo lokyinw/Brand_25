@@ -34,26 +34,13 @@ namespace Brand_25
 
         // --- Empirical compensation constants ------------------------------------
         // Viewport.SetBoxCenter() positions the crop+title envelope, not the crop
-        // itself, and the exact envelope-to-crop offset has proven inconsistent to
-        // pin down exactly (it didn't match a single clean formula in testing — some
-        // other factor we haven't isolated yet is contributing). Rather than chase
-        // the exact mechanism further, these two constants are plain fudge factors,
-        // tuned from live test measurements, applied on top of the dialog's own
-        // margin/spacing inputs. If a future test shows drift, adjust these numbers
-        // directly — no other code should need to change.
-        //
-        //   TopMarginCompensationMm: measured top margin ran ~53.5mm vs. an intended
-        //   15mm (ContentMarginTopMm) — i.e. about 38.5mm too generous. Added to the
-        //   top-of-sheet reference so the placed crop sits higher (smaller margin).
-        private const double TopMarginCompensationMm = 38.5;
-
-        //   YSpacingCompensationMm: measured row-to-row gap ran ~60-68mm against a
-        //   YSpacingMm of 27 — roughly 33-41mm too generous, averaging ~37mm.
-        //   Subtracted from YSpacingMm before use, so entering 27 lands closer to an
-        //   actual 27mm gap. Because the real offset varies row to row (~8mm swing
-        //   observed), this won't be exact every time — it's a "close enough"
-        //   correction, not a precise one.
-        private const double YSpacingCompensationMm = -37.0;
+        // itself, leaving a small residual constant offset (title/label padding)
+        // even after the ComputeLayout fix. These two are that residual, read
+        // directly off a clean test: top margin measured 12.8mm against an intended
+        // 15mm (2.2mm short), left margin measured 23.25mm against an intended 25mm
+        // (1.75mm short). If a future test shows drift, adjust these two directly.
+        private const double TopMarginCompensationMm = -2.2;
+        private const double LeftMarginCompensationMm = 1.75;
         // ---------------------------------------------------------------------------
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
@@ -114,13 +101,13 @@ namespace Brand_25
                 // the drawing area on the right for this title block. Changing to a
                 // different title block or paper size only ever means changing these
                 // eight dialog inputs — nothing below this point needs to change.
-                double leftEdgeFt = (inputWindow.FrameMarginLeftMm + inputWindow.ContentMarginLeftMm) * MmToFeet;
+                double leftEdgeFt = (inputWindow.FrameMarginLeftMm + inputWindow.ContentMarginLeftMm + LeftMarginCompensationMm) * MmToFeet;
                 double rightEdgeFt = (inputWindow.PaperWidthMm - inputWindow.FrameMarginRightMm - inputWindow.ContentMarginRightMm) * MmToFeet;
                 double topOfSheetFt = (inputWindow.PaperHeightMm - inputWindow.FrameMarginTopMm - inputWindow.ContentMarginTopMm + TopMarginCompensationMm) * MmToFeet;
                 double lowerEdgeFt = (inputWindow.FrameMarginBottomMm + inputWindow.ContentMarginBottomMm) * MmToFeet;
 
                 double xSpacingFt = inputWindow.XSpacingMm * MmToFeet;
-                double ySpacingFt = (inputWindow.YSpacingMm + YSpacingCompensationMm) * MmToFeet;
+                double ySpacingFt = inputWindow.YSpacingMm * MmToFeet;
 
                 // Step 3: collect matching elevation views (exact type + phase match,
                 // rather than the original script's substring match on a parameter string —
@@ -189,7 +176,7 @@ namespace Brand_25
                 // CropBox / view.Scale) and its Room's Level line position. This is a
                 // read-only pass over the View/Level/Room API — no Viewport instance or
                 // transaction is needed. The gap between this and what actually lands on
-                // paper is handled by the flat TopMarginCompensationMm / YSpacingCompensationMm
+                // paper is handled by the flat TopMarginCompensationMm / LeftMarginCompensationMm
                 // constants above, rather than by measuring per-view here.
                 List<double> widthsFt = new List<double>();
                 List<double> heightsFt = new List<double>();
@@ -380,7 +367,7 @@ namespace Brand_25
                         Parameter titleParam = v.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
                         titleParam?.Set($"{room.Number} {room.Name}");
 
-                        UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelLineTrim, log, issues);
+                        UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelExtensionMm, log, issues);
                     }
 
                     titleTrans.Commit();
@@ -422,14 +409,18 @@ namespace Brand_25
             }
         }
 
-        // Hides the bubble at both ends of every level visible in the view, shortens each
-        // level's line, and — only when this view ends its row — leaves the RIGHT-hand
-        // bubble visible, so the row still visually indicates which floor it belongs to.
-        // Translated from a Dynamo Python node the team already relies on; the trim
-        // formula (lineScale / view.Scale) is kept exactly as-is rather than
-        // reinterpreted — lineScale is a model-space length (no suffix), consumed
-        // directly here without unit conversion, same as the original script.
-        private void UpdateLevelDisplay(Document doc, View view, bool isRowEnd, double lineScale, StringBuilder log, List<string> issues)
+        // Extra paper-space extension given to the bubble end of a row-ending view,
+        // on top of LevelExtensionMm, so there's room to read the level bubble/text.
+        private const double RowEndBubbleExtraMm = 40.0;
+
+        // Hides the bubble at both ends of every level visible in the view, and
+        // repositions each level line's endpoints so exactly LevelExtensionMm of
+        // paper-space extension remains beyond the crop edge on each side (plus
+        // RowEndBubbleExtraMm on the bubble side, only for the view that ends its
+        // row) — rather than the original script's relative trim, this targets an
+        // absolute remaining length, since each level line's untrimmed overhang past
+        // the crop isn't the same on every view.
+        private void UpdateLevelDisplay(Document doc, View view, bool isRowEnd, double levelExtensionMm, StringBuilder log, List<string> issues)
         {
             List<Level> levelsInView = new FilteredElementCollector(doc, view.Id)
                 .OfCategory(BuiltInCategory.OST_Levels)
@@ -438,12 +429,14 @@ namespace Brand_25
 
             if (levelsInView.Count == 0) return;
 
-            // Used to work out which end of each level's line is on the RIGHT in this
-            // specific view, so the row-end retained bubble is on the correct side
-            // regardless of the view's rotation. Not part of the original script — worth
-            // confirming visually the first time this runs.
             Transform transform = view.CropBox.Transform;
-            double s = view.Scale;
+            BoundingBoxXYZ cropBox = view.CropBox;
+            double viewScale = view.Scale;
+
+            // Paper mm -> model feet: paper_mm * scale gives model mm, then * MmToFeet
+            // gives model feet (matches the convention used everywhere else in this file).
+            double standardExtensionFt = levelExtensionMm * viewScale * MmToFeet;
+            double bubbleEndExtensionFt = (levelExtensionMm + RowEndBubbleExtraMm) * viewScale * MmToFeet;
 
             foreach (Level level in levelsInView)
             {
@@ -456,9 +449,13 @@ namespace Brand_25
                     XYZ ep0 = curve.GetEndPoint(0);
                     XYZ ep1 = curve.GetEndPoint(1);
 
-                    double localX0 = transform.Inverse.OfPoint(ep0).X;
-                    double localX1 = transform.Inverse.OfPoint(ep1).X;
-                    bool end0IsRight = localX0 > localX1;
+                    // Local (view crop) coordinates preserve length, since Transform is
+                    // rigid (rotation + translation only) — so a distance measured here
+                    // equals the same real-world distance, just easier to compare
+                    // against the crop box, which is already expressed in this frame.
+                    XYZ localP0 = transform.Inverse.OfPoint(ep0);
+                    XYZ localP1 = transform.Inverse.OfPoint(ep1);
+                    bool end0IsRight = localP0.X > localP1.X;
                     DatumEnds rightEnd = end0IsRight ? DatumEnds.End0 : DatumEnds.End1;
                     DatumEnds leftEnd = end0IsRight ? DatumEnds.End1 : DatumEnds.End0;
 
@@ -473,11 +470,20 @@ namespace Brand_25
                         if (level.IsBubbleVisibleInView(DatumEnds.End1, view)) level.HideBubbleInView(DatumEnds.End1, view);
                     }
 
-                    // Shorten the line from each end — same technique as the original
-                    // script: offset along the curve's own direction by (scale / view.Scale).
-                    XYZ direction = (curve as Line).Direction;
-                    XYZ newEp0 = new XYZ(ep0.X + direction.X * lineScale / s, ep0.Y + direction.Y * lineScale / s, ep0.Z + direction.Z * lineScale / s);
-                    XYZ newEp1 = new XYZ(ep1.X - direction.X * lineScale / s, ep1.Y - direction.Y * lineScale / s, ep1.Z - direction.Z * lineScale / s);
+                    // The right end gets the bubble-side allowance only when this view
+                    // is a row-end (the only case where its bubble stays visible).
+                    double rightExtensionFt = isRowEnd ? bubbleEndExtensionFt : standardExtensionFt;
+                    double leftExtensionFt = standardExtensionFt;
+
+                    double newRightLocalX = cropBox.Max.X + rightExtensionFt;
+                    double newLeftLocalX = cropBox.Min.X - leftExtensionFt;
+
+                    double newLocalX0 = end0IsRight ? newRightLocalX : newLeftLocalX;
+                    double newLocalX1 = end0IsRight ? newLeftLocalX : newRightLocalX;
+
+                    XYZ newEp0 = transform.OfPoint(new XYZ(newLocalX0, localP0.Y, localP0.Z));
+                    XYZ newEp1 = transform.OfPoint(new XYZ(newLocalX1, localP1.Y, localP1.Z));
+
                     Curve newCurve = Line.CreateBound(newEp0, newEp1);
                     level.SetCurveInView(DatumExtentType.ViewSpecific, view, newCurve);
                 }
@@ -534,10 +540,22 @@ namespace Brand_25
         // (half of the current view + spacing + half of the next view), so
         // xSpacingFt has its literal meaning: the paper-space gap between two
         // viewports' crop edges. A row wraps to a new one when the next view's
-        // right edge would cross rightEdgeFt. Once a row is complete, it's aligned
-        // so every view's Level line lines up (using each view's own dist); if that
-        // aligned position would fall below lowerEdgeFt, the row instead starts a
-        // new sheet from topOfSheetFt.
+        // right edge would cross rightEdgeFt.
+        //
+        // Once a row is complete, it's aligned so every view's Level line lines up
+        // (each item's own dist offset from a shared per-row baseline). That baseline
+        // is placed so the row's HIGHEST point (topOffset = dist + height/2, the
+        // largest such value in the row) touches placeY exactly — NOT so the row's
+        // tallest height and largest dist independently subtract from placeY, which
+        // is what this used to do. Those aren't the same thing unless every item in
+        // every row happens to share an identical dist-to-height ratio, and they
+        // don't: the size of the resulting error tracked directly with each row's
+        // own crop heights, which is why margins/gaps came out a different amount
+        // "too generous" on every row instead of a single fixed offset.
+        //
+        // If that aligned position would put the row's LOWEST point (bottomOffset =
+        // dist - height/2, the smallest such value in the row) below lowerEdgeFt, the
+        // row instead starts a new sheet from topOfSheetFt.
         private LayoutResult ComputeLayout(List<double> widthsFt, List<double> heightsFt, List<double> distsFt,
             double leftEdgeFt, double xSpacingFt, double ySpacingFt, double rightEdgeFt, double topOfSheetFt, double lowerEdgeFt)
         {
@@ -557,18 +575,21 @@ namespace Brand_25
             int sheetIndex = 0;
             int rowStart = 0;
 
-            List<double> rowHeights = new List<double>();
-            List<double> rowDists = new List<double>();
+            // topOffset = how far this item's crop TOP sits above the row's shared
+            // level-line baseline; bottomOffset = how far its crop BOTTOM sits below
+            // (or above, if negative) that same baseline.
+            List<double> rowTopOffsets = new List<double>();
+            List<double> rowBottomOffsets = new List<double>();
 
             void FinalizeRow(int rowStartIndex, int rowEndIndex)
             {
-                double alignY = placeY - rowHeights.Max() - rowDists.Max();
+                double alignY = placeY - rowTopOffsets.Max();
 
-                if (alignY < lowerEdgeFt)
+                if (alignY + rowBottomOffsets.Min() < lowerEdgeFt)
                 {
                     sheetIndex++;
                     placeY = topOfSheetFt;
-                    alignY = placeY - rowHeights.Max() - rowDists.Max();
+                    alignY = placeY - rowTopOffsets.Max();
                 }
 
                 for (int i = rowStartIndex; i <= rowEndIndex; i++)
@@ -578,11 +599,12 @@ namespace Brand_25
                 }
                 result.IsRowEnd[rowEndIndex] = true;
 
-                // Next row starts below whichever view in this row extends furthest down.
-                placeY = result.PlaceY[rowEndIndex] - distsFt[rowEndIndex] - ySpacingFt;
+                // Next row starts below whichever view in THIS row extends furthest
+                // down — i.e. the row's true lowest point, not just its last item.
+                placeY = alignY + rowBottomOffsets.Min() - ySpacingFt;
 
-                rowHeights.Clear();
-                rowDists.Clear();
+                rowTopOffsets.Clear();
+                rowBottomOffsets.Clear();
             }
 
             for (int i = 0; i < widthsFt.Count; i++)
@@ -604,8 +626,8 @@ namespace Brand_25
                 }
 
                 result.PlaceX[i] = placeX;
-                rowHeights.Add(heightsFt[i]);
-                rowDists.Add(distsFt[i]);
+                rowTopOffsets.Add(distsFt[i] + heightsFt[i] / 2.0);
+                rowBottomOffsets.Add(distsFt[i] - heightsFt[i] / 2.0);
                 prevHalfWidth = halfWidth;
                 rowHasItems = true;
 

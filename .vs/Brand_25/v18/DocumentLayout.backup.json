@@ -3,20 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\brand_25.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
@@ -30,17 +30,17 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "Elev_PlaceOnSheets.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
               "RelativeDocumentMoniker": "Elev_PlaceOnSheets.cs",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
               "RelativeToolTip": "Elev_PlaceOnSheets.cs",
-              "ViewState": "AgIAAJYCAAAAAAAAAADwv7ICAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAK0CAAAAAAAAAAAIwMgCAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-16T05:18:54.241Z",
               "EditorCaption": ""
@@ -60,13 +60,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
               "Title": "App.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
               "RelativeDocumentMoniker": "App.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs*",
-              "RelativeToolTip": "App.cs*",
-              "ViewState": "AgIAADoAAAAAAAAAAAAcwF4AAAAAAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
+              "RelativeToolTip": "App.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAcwF4AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-16T01:43:41.221Z",
               "EditorCaption": ""
@@ -79,19 +79,19 @@
               "RelativeDocumentMoniker": "Selection_SheetLayout.xaml.cs",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml.cs",
               "RelativeToolTip": "Selection_SheetLayout.xaml.cs",
-              "ViewState": "AgIAAMgAAAAAAAAAAAAkwNUAAAANAAAAAAAAAA==",
+              "ViewState": "AgIAAM8AAAAAAAAAAAAmwOUAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-15T06:31:55.077Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "Selection_SheetLayout.xaml",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml",
               "RelativeDocumentMoniker": "Selection_SheetLayout.xaml",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml",
-              "RelativeToolTip": "Selection_SheetLayout.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml*",
+              "RelativeToolTip": "Selection_SheetLayout.xaml*",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
               "WhenOpened": "2026-07-15T06:31:45.181Z",
               "EditorCaption": ""

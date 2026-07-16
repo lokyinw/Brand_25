@@ -15,7 +15,7 @@ namespace Brand_25
     //   - Properties suffixed "Mm"  hold raw human-entered millimeters (paper space).
     //   - Properties suffixed "Ft"  (computed elsewhere) hold that same paper-space
     //     value converted to Revit's internal feet via MmToFeet.
-    //   - Properties with NO suffix (e.g. LevelLineTrim) are already in model-space
+    //   - Properties with NO suffix are already in model-space
     //     Revit internal feet, exactly as the Revit API returns them — no conversion
     //     is applied. If a value has no suffix, it's model space; if it does, it's
     //     paper space, in whichever of the two paper units the suffix names.
@@ -48,10 +48,12 @@ namespace Brand_25
         public double XSpacingMm { get; private set; }
         public double YSpacingMm { get; private set; }
 
-        // Model-space length (Revit internal feet) — see the unit convention note
-        // above. Consumed as-is by the level-line trim formula ported from the
-        // original Dynamo script; not reinterpreted here.
-        public double LevelLineTrim { get; private set; }
+        // Paper-space length: how much of each level line remains visible beyond the
+        // crop edge, after trimming. Consumed by Elev_PlaceOnSheets by computing each
+        // line's actual natural overhang past the crop (measured per-view, since it
+        // varies) and repositioning the endpoint so exactly this much remains — not a
+        // relative trim amount, so this has a literal, testable meaning on paper.
+        public double LevelExtensionMm { get; private set; }
 
         public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default")
         {
@@ -76,15 +78,15 @@ namespace Brand_25
             FrameMarginLeftBox.Text = "30";
             FrameMarginRightBox.Text = "21";
 
-            ContentMarginTopBox.Text = "15";
-            ContentMarginBottomBox.Text = "13";
+            ContentMarginTopBox.Text = "20";
+            ContentMarginBottomBox.Text = "10";
             ContentMarginLeftBox.Text = "25";
             ContentMarginRightBox.Text = "100"; // Drawing Information Area width: 841 - 720 - 21
 
             XSpacingBox.Text = "20";
-            YSpacingBox.Text = "27";
+            YSpacingBox.Text = "35";
 
-            LevelLineTrimBox.Text = "150";
+            LevelExtensionBox.Text = "7.5";
 
             List<ViewFamilyType> orderedTypes = elevationTypes.OrderBy(t => t.Name).ToList();
             ViewTypeCombo.ItemsSource = orderedTypes;
@@ -136,7 +138,7 @@ namespace Brand_25
             ParseNumber(XSpacingBox, "X Spacing", out double xSpacing);
             ParseNumber(YSpacingBox, "Y Spacing", out double ySpacing);
 
-            ParseNumber(LevelLineTrimBox, "Level Line Trim", out double levelLineTrim);
+            ParseNumber(LevelExtensionBox, "Level Extension", out double levelExtension);
 
             if (problems.Count > 0)
             {
@@ -165,7 +167,7 @@ namespace Brand_25
             XSpacingMm = xSpacing;
             YSpacingMm = ySpacing;
 
-            LevelLineTrim = levelLineTrim;
+            LevelExtensionMm = levelExtension;
 
             this.DialogResult = true;
         }
