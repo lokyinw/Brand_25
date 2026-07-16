@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <None Remove="Resources\Images\elev_on_sheet_32.png" />
+    <None Remove="Resources\Images\Text_ConsolidateType_32.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -72,6 +73,7 @@
     <EmbeddedResource Include="Resources\Images\B_icon_32.png" />
     <EmbeddedResource Include="Resources\Images\intelev_32.png" />
     <EmbeddedResource Include="Resources\Images\hide_markup_32.png" />
+    <EmbeddedResource Include="Resources\Images\Text_ConsolidateType_32.png" />
     <EmbeddedResource Include="Resources\Images\unhide_markup_32.png" />
     <EmbeddedResource Include="Resources\Images\Placeholder_32.png" />
     <EmbeddedResource Include="Resources\Images\Grid_Propagate_Status_32.png" />

@@ -72,32 +72,26 @@ namespace Brand_25
             RibbonPanel panel4 = application.CreateRibbonPanel(tabName, "Text");
             PushButtonData btnData4a = new PushButtonData("btn4a", "Hide\nMark-ups", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_HideTemp");
             PushButtonData btnData4b = new PushButtonData("btn4b", "UnHide\nMark-ups", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_UnhideTemp");
-            //PushButtonData btnData4c = new PushButtonData("btn4c", "Consolidate\nTypes", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
+            PushButtonData btnData4c = new PushButtonData("btn4c", "Consolidate\nTypes", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
             btnData4a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.hide_markup_32.png");
             btnData4b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.unhide_markup_32.png");
-            //btnData4c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
+            btnData4c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Text_ConsolidateType_32.png");
             btnData4a.ToolTip = "Hide the Markup and Temp Text by keyword in Text Type";
             btnData4b.ToolTip = "Unhide the hidden text. You must have a hidden text to proceed with.";
-            //btnData4c.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
-            //panel4.AddItem(btnData4c);
+            btnData4c.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
+            panel4.AddItem(btnData4c);
 
-            RibbonPanel panel5 = application.CreateRibbonPanel(tabName, "Material");
+            /*RibbonPanel panel5 = application.CreateRibbonPanel(tabName, "Material");
             PushButtonData btnData5a = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
             btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData5a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
-            panel5.AddItem(btnData5a);
+            panel5.AddItem(btnData5a);*/
 
-            // Control-test panel: standalone, unrelated to the main workflow. Remove once
-            // the GetCropShape/SetCropShape investigation is finished.
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
-            //PushButtonData btnDataTestCrop = new PushButtonData("btnTestCrop", "Test Crop\nShape Adjust", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_TestCropShapeAdjust");
-            PushButtonData btnDataTestc = new PushButtonData("btn4c", "Consolidate\nTypes", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
-            //btnDataTestCrop.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnDataTestc.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            //btnDataTestCrop.ToolTip = "CONTROL TEST: lowers the active elevation/section view's crop shape top by 2 feet via GetCropShape/SetCropShape, done as a standalone action on an already-existing view. Reports success or the exact exception.";
-            btnDataTestc.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
-            //panelTest.AddItem(btnDataTestCrop);
-            panelTest.AddItem(btnDataTestc);
+            PushButtonData btnData5a = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
+            btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
+            panelTest.AddItem(btnData5a);
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
