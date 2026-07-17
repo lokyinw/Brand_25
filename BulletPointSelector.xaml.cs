@@ -31,7 +31,8 @@ namespace Brand_25
                 List<string> bulletPoints,
                 string credit = "Default Warning",
                 bool showCustomInput = false,
-                bool singleSelectionMode = false)
+                bool singleSelectionMode = false,
+                List<string> preSelectedItems = null)
         {
             InitializeComponent();
             _singleSelectionMode = singleSelectionMode;
@@ -47,7 +48,8 @@ namespace Brand_25
             // Create dynamic checkboxes
             foreach (string item in bulletPoints)
             {
-                AddCheckBox(item);
+                bool isPreSelected = preSelectedItems != null && preSelectedItems.Contains(item);
+                AddCheckBox(item, isPreSelected);
             }
 
             // Add custom input as last item if requested
@@ -86,13 +88,13 @@ namespace Brand_25
             CheckBoxPanel.Columns = totalItems >= TwoColumnThreshold ? 2 : 1;
         }
 
-        private void AddCheckBox(string content)
+        private void AddCheckBox(string content, bool isChecked = false)
         {
             CheckBox checkBox = new CheckBox
             {
                 Content = content,
                 Style = (Style)FindResource("CheckBoxStyle"),
-                IsChecked = false // Default to unchecked in single selection mode
+                IsChecked = isChecked
             };
 
             if (_singleSelectionMode)

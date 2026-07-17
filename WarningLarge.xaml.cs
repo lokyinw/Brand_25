@@ -14,18 +14,28 @@ namespace Brand_25
     /// </summary>
     public partial class WarningLarge : Window
     {
-        public WarningLarge(string title, string message, string footerText = "Default Warning")
+        private readonly string _revealPath;
+
+        // revealPath: optional file or folder to reveal via the "Open Log Folder"
+        // button. Leave it null (the default) and the button stays hidden — existing
+        // calls elsewhere in the codebase are unaffected.
+        public WarningLarge(string title, string message, string footerText = "Default Warning",
+                             string revealPath = null)
         {
             InitializeComponent();
             MessageText.Text = message;
             TitleText.Text = title;
             FooterText.Text = footerText;
+            _revealPath = revealPath;
 
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");
             maximizeImage.Source = LoadEmbeddedImage("maximize_32.png");
             closeImage.Source = LoadEmbeddedImage("close_32.png");
             brandLogo.Source = LoadEmbeddedImage("Brand_logo.png");
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
+
+            if (!string.IsNullOrEmpty(_revealPath))
+                OpenFolderButton.Visibility = Visibility.Visible;
         }
 
         private BitmapImage LoadEmbeddedImage(string imageName)
@@ -75,6 +85,25 @@ namespace Brand_25
         {
             this.DialogResult = true;
             this.Close();
+        }
+
+        private void OpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_revealPath)) return;
+
+            try
+            {
+                if (File.Exists(_revealPath))
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_revealPath}\"");
+                else if (Directory.Exists(_revealPath))
+                    System.Diagnostics.Process.Start("explorer.exe", $"\"{_revealPath}\"");
+                else
+                    new Warning("Not Found", $"Could not find:\n{_revealPath}", "WarningLarge").ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                new Warning("Could Not Open Folder", ex.Message, "WarningLarge").ShowDialog();
+            }
         }
     }
 }

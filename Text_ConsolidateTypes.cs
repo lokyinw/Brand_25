@@ -11,28 +11,30 @@ namespace Brand_25
     [Transaction(TransactionMode.Manual)]
     public class Text_ConsolidateTypes : IExternalCommand
     {
-        private const string credit = "Last Modified by Lok on 2026-03-30. Beta 0.90";
-
-        // All attribute display names available for comparison
-        private static readonly List<string> AvailableAttributes = new List<string>
-        {
-            "Bold",
-            "Italic",
-            "Underline",
-            "Width Factor",
-            "Background",
-            "Show Border",
-            "Line Weight",
-            "Leader Arrowhead",
-            "Leader Offset",
-            "Tab Size",
-            "Colour"
-        };
+        private const string credit = "Last Modified by Lok on 2026-07-16. Beta 0.91";
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             Document doc = commandData.Application.ActiveUIDocument.Document;
 
+            try
+            {
+                return RunConsolidation(doc);
+            }
+            catch (Exception ex)
+            {
+                // Any unexpected failure (locked elements, worksharing conflicts, etc.)
+                // surfaces as a branded warning instead of Revit's raw error dialog.
+                new Warning("Unexpected Error",
+                    $"Text Note Type consolidation could not complete:\n\n{ex.Message}",
+                    credit).ShowDialog();
+                message = ex.Message;
+                return Result.Failed;
+            }
+        }
+
+        private Result RunConsolidation(Document doc)
+        {
             // ── Step 1: Collect all TextNoteTypes ────────────────────────────
 
             List<TextNoteType> allTypes = new FilteredElementCollector(doc)
@@ -48,20 +50,34 @@ namespace Brand_25
                 return Result.Cancelled;
             }
 
-            // ── Step 2: Dialog 1 — user picks which extra attributes to compare
+            // ── Step 2: Dialog 1 — user picks which attributes to compare ─────
+            // Text Font and Text Size are included here (pre-selected) so the user sees
+            // the full picture rather than having them silently hardcoded as "always
+            // compared" — every attribute, checked or not, is on equal footing now.
 
-            var attributePicker = new BulletPointSelector(
-                title: "Compare Text Note Types",
-                instruction: "Type Name, Text Font and Text Size are always compared.\nSelect any additional attributes to include:",
-                bulletPoints: AvailableAttributes,
-                credit: credit,
-                showCustomInput: false,
-                singleSelectionMode: false);
+            List<string> selectedAttributes;
+            while (true)
+            {
+                var attributePicker = new BulletPointSelector(
+                    title: "Compare Text Note Types",
+                    instruction: "Select the attributes to compare.\nMatching Text Note Types will be grouped for consolidation.\nUnchecked attributes are ignored, meaning types will be consolidated even if those specific values differ.",
+                    bulletPoints: TextNoteAttributeCatalog.DisplayNames,
+                    credit: credit,
+                    showCustomInput: false,
+                    singleSelectionMode: false,
+                    preSelectedItems: TextNoteAttributeCatalog.DefaultSelectedNames);
 
-            if (attributePicker.ShowDialog() != true)
-                return Result.Cancelled;
+                if (attributePicker.ShowDialog() != true)
+                    return Result.Cancelled;
 
-            List<string> extraAttributes = attributePicker.SelectedItems;
+                selectedAttributes = attributePicker.SelectedItems;
+
+                if (selectedAttributes.Count > 0)
+                    break;
+
+                new Warning("No Attributes Selected",
+                    "Please select at least one attribute to compare.", credit).ShowDialog();
+            }
 
             // ── Step 3: Build VMs and comparison keys ─────────────────────────
 
@@ -70,7 +86,7 @@ namespace Brand_25
                 .ToList();
 
             foreach (var vm in viewModels)
-                vm.ComparisonKey = BuildComparisonKey(vm, extraAttributes);
+                vm.ComparisonKey = BuildComparisonKey(vm, selectedAttributes);
 
             // ── Step 4: Find duplicate groups ─────────────────────────────────
 
@@ -96,7 +112,6 @@ namespace Brand_25
                 .Cast<TextNote>()
                 .ToList();
 
-            // Build a lookup: TypeId → all TextNote instances
             var notesByTypeId = allNotes
                 .GroupBy(n => n.GetTypeId())
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -113,75 +128,25 @@ namespace Brand_25
                 }
             }
 
-            // ── Step 6: Dialog 2 — duplicate report ───────────────────────────
+            // ── Step 6: Dialog — combined duplicate overview + survivor picker ─
+            // Previously this was two dialogs (an overview grid, then a per-group
+            // picker). They showed the same data, so now it's one table listing
+            // every candidate across every group, with a per-group survivor radio
+            // column — see Consolidate_TextNoteType for the merged behavior.
 
-            var reportDialog = new Report_DupTextNoteType(duplicateGroups, extraAttributes, credit);
-            reportDialog.ShowDialog();
-
-            if (!reportDialog.ProceedWithConsolidation)
-                return Result.Succeeded;
-
-            // ── Step 7: Dialog 3 — pick survivor per group ────────────────────
-
-            var consolidateDialog = new Consolidate_TextNoteType(duplicateGroups, credit);
+            var consolidateDialog = new Consolidate_TextNoteType(duplicateGroups, selectedAttributes, credit);
             if (consolidateDialog.ShowDialog() != true)
                 return Result.Succeeded;
 
             Dictionary<TextNoteType, TextNoteType> survivorMap = consolidateDialog.SurvivorSelections;
 
-            // ── Step 8: Dialog 4 — confirmation summary ───────────────────────
-            //
+            // ── Step 7: Location helper for the log ─────────────────────────────
             // NOTE: any redundant type that has EVEN ONE instance inside a group is
             // entirely excluded from consolidation (not just its grouped instances).
             // Revit's API does not allow safely reassigning/deleting a type that has
             // members inside a group without risking corruption of the group, so we
-            // leave those types completely untouched and flag them instead — reported
-            // as "None reassigned" rather than a count, since no work happens on them.
-
-            int totalDeletePreview = 0;
-            int totalSkipPreview = 0;
-            var summaryLines = new List<string>();
-
-            foreach (var kvp in survivorMap)
-            {
-                TextNoteType redundant = kvp.Key;
-                TextNoteType survivor = kvp.Value;
-
-                if (notesByTypeId.TryGetValue(redundant.Id, out var affectedNotes))
-                {
-                    bool hasGroupedInstances = affectedNotes.Any(n => n.GroupId != ElementId.InvalidElementId);
-
-                    if (hasGroupedInstances)
-                    {
-                        totalSkipPreview++;
-                        summaryLines.Add(
-                            $"  \u26A0 {redundant.Name}  \u2192  {survivor.Name}  (None reassigned \u2014 instance(s) inside a group; type left untouched)");
-                        continue;
-                    }
-
-                    totalDeletePreview++;
-                    summaryLines.Add($"  \u2705 {redundant.Name}  \u2192  {survivor.Name}  ({affectedNotes.Count} reassigned)");
-                }
-                else
-                {
-                    totalDeletePreview++;
-                    summaryLines.Add($"  \u2705 {redundant.Name}  \u2192  {survivor.Name}  (0 instances)");
-                }
-            }
-
-            string confirmMessage =
-                $"Ready to consolidate:\n\n" +
-                string.Join("\n", summaryLines) +
-                $"\n\n  \uD83D\uDDD1 {totalDeletePreview} type(s) will be deleted." +
-                (totalSkipPreview > 0
-                    ? $"\n  \u26A0 {totalSkipPreview} type(s) will be left untouched \u2014 see \"None reassigned\" above."
-                    : "\n  No types will be skipped.");
-
-            var confirmDialog = new WarningLarge("Confirm Consolidation", confirmMessage, credit);
-            if (confirmDialog.ShowDialog() != true)
-                return Result.Succeeded;
-
-            // ── Step 8b: Location helper for the glitch log ───────────────────
+            // leave those types completely untouched and flag them instead.
+            //
             // A TextNote's OwnerViewId is the view it's actually drawn in. Only
             // report "Sheet:" when that owner view IS a sheet (the note/group sits
             // directly on the sheet). If it's in a regular view — even one that's
@@ -197,177 +162,148 @@ namespace Brand_25
                 return $"View: \"{(ownerView?.Name ?? "Unknown View")}\"";
             }
 
-            // ── Step 9: Execute — single transaction ──────────────────────────
+            // ── Step 8: Execute — single transaction ──────────────────────────
 
             int reassigned = 0;
             var skippedTypeNames = new List<string>();
-            var glitchLogEntries = new List<string>();
-            var resultLines = new List<string>();
+            var logEntries = new List<string>();
 
             using (Transaction t = new Transaction(doc, "LW_Consolidate Text Note Types"))
             {
                 t.Start();
 
-                foreach (var kvp in survivorMap)
-                {
-                    TextNoteType redundant = kvp.Key;
-                    TextNoteType survivor = kvp.Value;
-
-                    // Capture names up front — once doc.Delete() runs on redundant,
-                    // the object is invalid and reading .Name off it throws
-                    // InvalidObjectException, even just for logging purposes afterward.
-                    string redundantName = redundant.Name;
-                    string survivorName = survivor.Name;
-
-                    if (!notesByTypeId.TryGetValue(redundant.Id, out var affectedNotes))
-                    {
-                        // No instances — delete immediately
-                        doc.Delete(redundant.Id);
-                        resultLines.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  (0 instances)");
-                        continue;
-                    }
-
-                    var groupedNotes = affectedNotes
-                        .Where(n => n.GroupId != ElementId.InvalidElementId)
-                        .ToList();
-
-                    if (groupedNotes.Any())
-                    {
-                        // Revit's API cannot safely reassign or delete a type that has
-                        // members inside a group — doing so has been observed to silently
-                        // corrupt/erase the group's content. Leave the type fully intact.
-                        skippedTypeNames.Add(redundantName);
-                        resultLines.Add(
-                            $"  \u26A0 {redundantName}  \u2192  {survivorName}  (None reassigned \u2014 instance(s) inside a group; type left untouched)");
-
-                        var groupInfo = groupedNotes
-                            .Select(n => new
-                            {
-                                GroupId = n.GroupId,
-                                Location = DescribeLocation(n)
-                            })
-                            .Distinct();
-
-                        foreach (var gi in groupInfo)
-                        {
-                            glitchLogEntries.Add(
-                                $"Type: \"{redundantName}\"   Group ID: {gi.GroupId.Value}   {gi.Location}");
-                        }
-
-                        continue;
-                    }
-
-                    // No grouped instances — safe to consolidate normally
-                    foreach (TextNote note in affectedNotes)
-                    {
-                        note.ChangeTypeId(survivor.Id);
-                        reassigned++;
-                    }
-
-                    doc.Delete(redundant.Id);
-                    resultLines.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  ({affectedNotes.Count} reassigned)");
-                }
-
-                t.Commit();
-            }
-
-            // ── Step 9b: Write glitch log (if anything was skipped) ───────────
-
-            string logFilePath = null;
-
-            if (glitchLogEntries.Any())
-            {
                 try
                 {
-                    string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                    string fileName = $"TextNoteType_Consolidation_Glitches_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt";
-                    logFilePath = Path.Combine(documentsFolder, fileName);
-
-                    var logLines = new List<string>
+                    foreach (var kvp in survivorMap)
                     {
-                        "Text Note Type Consolidation — Glitch Log",
-                        $"Run: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
-                        $"Project: {doc.Title}",
-                        new string('-', 70),
-                        $"{skippedTypeNames.Distinct().Count()} type(s) skipped because they have instances inside a group:",
-                        ""
-                    };
-                    logLines.AddRange(glitchLogEntries);
+                        TextNoteType redundant = kvp.Key;
+                        TextNoteType survivor = kvp.Value;
 
-                    File.WriteAllLines(logFilePath, logLines);
+                        // Capture names up front — once doc.Delete() runs on redundant,
+                        // the object is invalid and reading .Name off it throws
+                        // InvalidObjectException, even just for logging afterward.
+                        string redundantName = redundant.Name;
+                        string survivorName = survivor.Name;
+
+                        if (!notesByTypeId.TryGetValue(redundant.Id, out var affectedNotes))
+                        {
+                            doc.Delete(redundant.Id);
+                            logEntries.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  (0 instances)");
+                            continue;
+                        }
+
+                        var groupedNotes = affectedNotes
+                            .Where(n => n.GroupId != ElementId.InvalidElementId)
+                            .ToList();
+
+                        if (groupedNotes.Any())
+                        {
+                            // Revit's API cannot safely reassign or delete a type that has
+                            // members inside a group — doing so has been observed to silently
+                            // corrupt/erase the group's content. Leave the type fully intact.
+                            skippedTypeNames.Add(redundantName);
+                            logEntries.Add(
+                                $"  \u26A0 {redundantName}  \u2192  {survivorName}  (None reassigned \u2014 instance(s) inside a group; type left untouched)");
+
+                            // List every skipped instance individually — this is the log's
+                            // primary purpose, since these are the notes the add-in could not
+                            // touch (Revit's API doesn't allow editing group members) and the
+                            // user may need to track down and handle manually.
+                            foreach (TextNote groupedNote in groupedNotes)
+                            {
+                                logEntries.Add(
+                                    $"      TextNote ID: {groupedNote.Id.Value}   Group ID: {groupedNote.GroupId.Value}   {DescribeLocation(groupedNote)}");
+                            }
+
+                            continue;
+                        }
+
+                        // No grouped instances — safe to consolidate normally
+                        foreach (TextNote note in affectedNotes)
+                        {
+                            note.ChangeTypeId(survivor.Id);
+                            reassigned++;
+                        }
+
+                        doc.Delete(redundant.Id);
+                        logEntries.Add($"  \u2705 {redundantName}  \u2192  {survivorName}  ({affectedNotes.Count} reassigned)");
+                    }
+
+                    t.Commit();
                 }
                 catch
                 {
-                    // If the log can't be written, still proceed — the in-app warning
-                    // below still tells the user which types were skipped.
-                    logFilePath = null;
+                    if (t.HasStarted() && !t.HasEnded())
+                        t.RollBack();
+                    throw;
                 }
             }
 
-            // ── Step 10: Dialog 5 — completion report ─────────────────────────
+            int typesDeleted = survivorMap.Count - skippedTypeNames.Count;
+
+            // ── Step 8b: Write log — always, so there's always somewhere the user
+            // can find the full per-type breakdown that used to live in the dialogs.
+
+            string logFilePath = WriteLog(doc, selectedAttributes, typesDeleted, skippedTypeNames,
+                                           reassigned, logEntries);
+
+            // ── Step 9: Dialog — completion report (kept to the essentials;
+            // everything else is in the log) ──────────────────────────────────
 
             string completionMessage =
-                $"Consolidation complete.\n\n" +
-                string.Join("\n", resultLines) +
-                $"\n\n  \u2705 {reassigned} TextNote(s) reassigned in total.\n" +
-                $"  \uD83D\uDDD1 {survivorMap.Count - skippedTypeNames.Count} type(s) deleted.";
+                $"\u25CF  {typesDeleted} Text Note Type(s) deleted.\n" +
+                $"\u25CF  {skippedTypeNames.Distinct().Count()} Text Note Type(s) left untouched (There are instances inside some groups).\n" +
+                $"\u25CF  {reassigned} instance(s) reassigned in total.\n\n" +
+                (logFilePath != null
+                    ? $"Full details logged to:\n   {logFilePath}"
+                    : "The log file could not be written.");
 
-            if (skippedTypeNames.Any())
-            {
-                completionMessage +=
-                    $"\n\n  \u26A0 {skippedTypeNames.Distinct().Count()} type(s) left untouched (None reassigned) \u2014 details logged to:\n" +
-                    (logFilePath != null ? $"      {logFilePath}" : "      (log could not be written)");
-            }
-            else
-            {
-                completionMessage += "\n\n  No types were skipped.";
-            }
-
-            new WarningLarge("Consolidation Complete", completionMessage, credit).ShowDialog();
+            new WarningLarge("Consolidation Complete", completionMessage, credit, revealPath: logFilePath).ShowDialog();
 
             return Result.Succeeded;
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static string BuildComparisonKey(VM_TextNoteType vm, List<string> extraAttributes)
+        private static string WriteLog(Document doc, List<string> selectedAttributes, int typesDeleted,
+                                        List<string> skippedTypeNames, int reassigned, List<string> logEntries)
         {
-            // Always compare font and size; round size to avoid floating-point mismatches
-            var parts = new List<string>
+            try
             {
-                vm.TextFont,
-                RoundedSize(vm.TextSize)
-            };
+                string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string fileName = $"TextNoteType_Consolidation_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt";
+                string logFilePath = Path.Combine(documentsFolder, fileName);
 
-            foreach (string attr in extraAttributes)
-            {
-                switch (attr)
+                var logLines = new List<string>
                 {
-                    case "Bold": parts.Add(vm.Bold); break;
-                    case "Italic": parts.Add(vm.Italic); break;
-                    case "Underline": parts.Add(vm.Underline); break;
-                    case "Width Factor": parts.Add(vm.WidthFactor); break;
-                    case "Background": parts.Add(vm.Background); break;
-                    case "Show Border": parts.Add(vm.ShowBorder); break;
-                    case "Line Weight": parts.Add(vm.LineWeight); break;
-                    case "Leader Arrowhead": parts.Add(vm.LeaderArrowhead); break;
-                    case "Leader Offset": parts.Add(vm.LeaderOffset); break;
-                    case "Tab Size": parts.Add(vm.TabSize); break;
-                    case "Colour": parts.Add(vm.Colour); break;
-                }
-            }
+                    "Text Note Type Consolidation — Log",
+                    $"Run: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                    $"Project: {doc.Title}",
+                    $"Attributes compared: {string.Join(", ", selectedAttributes)}",
+                    new string('-', 70),
+                    $"{typesDeleted} type(s) deleted.",
+                    $"{skippedTypeNames.Distinct().Count()} type(s) left untouched (instance(s) inside a group).",
+                    $"{reassigned} instance(s) reassigned in total.",
+                    "",
+                    "Per-type detail:",
+                    ""
+                };
+                logLines.AddRange(logEntries);
 
-            return string.Join("|", parts);
+                File.WriteAllLines(logFilePath, logLines);
+                return logFilePath;
+            }
+            catch
+            {
+                // If the log can't be written, the completion dialog says so — still
+                // proceed, since the consolidation itself already committed.
+                return null;
+            }
         }
 
-        // Strip the " mm" suffix and round to 2dp so floating-point noise doesn't
-        // produce false non-matches between types with the same nominal size
-        private static string RoundedSize(string textSize)
+        private static string BuildComparisonKey(VM_TextNoteType vm, List<string> selectedAttributes)
         {
-            string numeric = textSize.Replace(" mm", "").Trim();
-            if (double.TryParse(numeric, out double val))
-                return val.ToString("F2");
-            return textSize;
+            return string.Join("|", selectedAttributes.Select(a => TextNoteAttributeCatalog.Find(a)?.Getter(vm) ?? ""));
         }
     }
 }

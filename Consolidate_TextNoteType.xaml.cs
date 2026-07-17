@@ -1,19 +1,21 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
 namespace Brand_25
 {
     /// <summary>
-    /// Shows one duplicate group at a time and asks the user to pick the survivor.
-    /// Call ShowDialog() — if result is true, read SurvivorSelections.
+    /// Combined duplicate overview + survivor picker. Shows every candidate across
+    /// every duplicate group in one table (shaded rows share a group), with a
+    /// per-row Survivor radio button scoped to its own group via
+    /// VM_TextNoteType.DuplicateGroupKey. Call ShowDialog() — if result is true,
+    /// read SurvivorSelections.
     /// </summary>
     public partial class Consolidate_TextNoteType : Window
     {
@@ -22,121 +24,133 @@ namespace Brand_25
             = new Dictionary<TextNoteType, TextNoteType>();
 
         private readonly List<List<VM_TextNoteType>> _groups;
-        private int _currentIndex = 0;
-        private List<RadioButton> _radioButtons = new List<RadioButton>();
+        private readonly List<string> _selectedAttributes;
+        private readonly Dictionary<string, List<VM_TextNoteType>> _groupsByKey =
+            new Dictionary<string, List<VM_TextNoteType>>();
 
         public Consolidate_TextNoteType(List<List<VM_TextNoteType>> duplicateGroups,
+                                        List<string> selectedAttributes,
                                         string credit = "Consolidate_TextNoteType Default")
         {
             _groups = duplicateGroups;
+            _selectedAttributes = selectedAttributes;
 
             InitializeComponent();
+
+            int typeCount = duplicateGroups.Sum(g => g.Count);
+            int groupCount = duplicateGroups.Count;
+            TitleText.Text = $"Duplicate Text Note Types — {typeCount} types across {groupCount} groups";
+            SubtitleText.Text = "Select exactly one survivor per group — shaded rows share a group. " +
+                                 "Grey columns weren't part of the comparison, so those values may differ within a group.";
             FooterText.Text = credit;
 
+            minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");
+            maximizeImage.Source = LoadEmbeddedImage("maximize_32.png");
             closeImage.Source = LoadEmbeddedImage("close_32.png");
             brandLogo.Source = LoadEmbeddedImage("Brand_logo.png");
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
 
-            ShowGroup(0);
+            TextNoteAttributeCatalog.BuildAllColumns(SurvivorGrid, _selectedAttributes);
+            BuildRows();
         }
 
-        private void ShowGroup(int index)
+        private void BuildRows()
         {
-            _currentIndex = index;
-            var group = _groups[index];
+            var rows = new List<VM_TextNoteType>();
+            bool shade = false;
+            int groupIndex = 0;
 
-            TitleText.Text = $"Select Survivor — Group {index + 1} of {_groups.Count}";
-            SubtitleText.Text = $"These {group.Count} types share identical compared attributes. Select the one to KEEP.";
-
-            // Rebuild radio buttons for this group
-            SurvivorPanel.Children.Clear();
-            _radioButtons.Clear();
-
-            foreach (var vm in group.OrderBy(v => v.TypeName))
+            foreach (var group in _groups.OrderBy(g => g.First().TextFont)
+                                          .ThenBy(g => g.First().TextSize))
             {
-                string label = $"{vm.TypeName}    [{vm.TextFont}, {vm.TextSize}]" +
-                               $"    Instances: {vm.InstanceCount}" +
-                               (vm.InstancesInGroups > 0 ? $"  ⚠ {vm.InstancesInGroups} in groups" : "");
+                // Each duplicate group gets its own key so SurvivorRadio_Checked can
+                // enforce "exactly one survivor" independently per group.
+                string groupKey = $"SurvivorGroup_{groupIndex}";
 
-                var rb = new RadioButton
+                // Default to the type with the most instances, unless the user already
+                // made a choice for this group (persists on the VM itself).
+                if (!group.Any(vm => vm.IsSurvivor))
                 {
-                    Content = label,
-                    Tag = vm,
-                    FontFamily = new System.Windows.Media.FontFamily("Calibri"),
-                    FontSize = 15,
-                    Margin = new Thickness(5, 4, 5, 4),
-                    Foreground = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x27, 0x27, 0x27))
-                };
+                    var defaultChoice = group.OrderByDescending(vm => vm.InstanceCount).FirstOrDefault();
+                    if (defaultChoice != null) defaultChoice.IsSurvivor = true;
+                }
 
-                _radioButtons.Add(rb);
-                SurvivorPanel.Children.Add(rb);
+                foreach (var vm in group.OrderBy(v => v.TypeName))
+                {
+                    vm.GroupShade = shade;
+                    vm.DuplicateGroupKey = groupKey;
+                    rows.Add(vm);
+                }
+
+                _groupsByKey[groupKey] = group;
+
+                shade = !shade;
+                groupIndex++;
             }
 
-            // Default: select the type with the most instances
-            var defaultChoice = _radioButtons
-                .OrderByDescending(rb => ((VM_TextNoteType)rb.Tag).InstanceCount)
-                .FirstOrDefault();
-            if (defaultChoice != null) defaultChoice.IsChecked = true;
-
-            // Update navigation buttons
-            BackButton.IsEnabled = index > 0;
-            NextButton.Content = index == _groups.Count - 1 ? "Confirm" : "Next ›";
+            SurvivorGrid.ItemsSource = rows;
         }
 
-        private void Next_Click(object sender, RoutedEventArgs e)
+        // Owns Survivor exclusivity explicitly, keyed off the underlying data rather
+        // than WPF's GroupName mechanism — GroupName-based grouping across a single
+        // virtualized DataGrid was found to desync when row containers got recycled
+        // during scrolling, letting the wrong VM end up flagged as the survivor.
+        private void SurvivorRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (!RecordSelection()) return;
+            if (!(sender is System.Windows.Controls.RadioButton rb) ||
+                !(rb.DataContext is VM_TextNoteType checkedVm))
+                return;
 
-            if (_currentIndex == _groups.Count - 1)
-            {
-                // Last group — done
-                DialogResult = true;
-                Close();
-            }
-            else
-            {
-                ShowGroup(_currentIndex + 1);
-            }
+            if (!_groupsByKey.TryGetValue(checkedVm.DuplicateGroupKey, out var members))
+                return;
+
+            foreach (var member in members)
+                member.IsSurvivor = (member == checkedVm);
         }
 
-        private void Back_Click(object sender, RoutedEventArgs e)
+        private void Consolidate_Click(object sender, RoutedEventArgs e)
         {
-            // Record current selection before going back so it persists
-            RecordSelection();
-            ShowGroup(_currentIndex - 1);
-        }
-
-        private bool RecordSelection()
-        {
-            var selectedRb = _radioButtons.FirstOrDefault(rb => rb.IsChecked == true);
-            if (selectedRb == null)
+            foreach (var group in _groups)
             {
-                new Warning("No Selection", "Please select a type to keep before continuing.", "Consolidate_TextNoteType")
-                    .ShowDialog();
-                return false;
+                var survivor = group.FirstOrDefault(vm => vm.IsSurvivor);
+                if (survivor == null)
+                {
+                    new Warning("Missing Selection",
+                        "Please select a survivor for every duplicate group before continuing.",
+                        "Consolidate_TextNoteType").ShowDialog();
+                    return;
+                }
+
+                foreach (var vm in group)
+                {
+                    if (vm.TextNoteType.Id != survivor.TextNoteType.Id)
+                        SurvivorSelections[vm.TextNoteType] = survivor.TextNoteType;
+                }
             }
 
-            var survivor = (VM_TextNoteType)selectedRb.Tag;
-            var group = _groups[_currentIndex];
-
-            // Map every non-survivor in this group → survivor
-            foreach (var vm in group)
-            {
-                if (vm.TextNoteType.Id != survivor.TextNoteType.Id)
-                    SurvivorSelections[vm.TextNoteType] = survivor.TextNoteType;
-            }
-
-            return true;
+            DialogResult = true;
+            Close();
         }
 
-        private void CancelAll_Click(object sender, RoutedEventArgs e)
+        private void Cancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
             Close();
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
+
+        private void buttonMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+        private void buttonMaximize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            maximizeImage.Source = LoadEmbeddedImage(
+                WindowState == WindowState.Maximized ? "restore_32.png" : "maximize_32.png");
+        }
+
         private void buttonClose_Click(object sender, RoutedEventArgs e) { DialogResult = false; Close(); }
 
         private BitmapImage LoadEmbeddedImage(string imageName)
