@@ -99,8 +99,8 @@
         <!-- Action Buttons -->
         <Button Content="OK" Width="80" Height="30" Click="CloseDialog" 
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="3" VerticalAlignment="Bottom"
-                Margin="10 0 0 10"/>
+                HorizontalAlignment="Left" Grid.Row="3" VerticalAlignment="Center"
+                Margin="17 0 0 10"/>
 
         <!-- Footer -->
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Grid.Row="3" Margin="0 0 10 10" >

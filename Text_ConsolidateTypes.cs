@@ -11,7 +11,7 @@ namespace Brand_25
     [Transaction(TransactionMode.Manual)]
     public class Text_ConsolidateTypes : IExternalCommand
     {
-        private const string credit = "Last Modified by Lok on 2026-07-16. Beta 0.91";
+        private const string credit = "Last Modified by Lok on 2026-07-18. Beta 0.92";
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -59,8 +59,8 @@ namespace Brand_25
             while (true)
             {
                 var attributePicker = new BulletPointSelector(
-                    title: "Compare Text Note Types",
-                    instruction: "Select the attributes to compare.\nMatching Text Note Types will be grouped for consolidation.\nUnchecked attributes are ignored, meaning types will be consolidated even if those specific values differ.",
+                    title: "Consolidate Text Note Type with same Attributes",
+                    instruction: "Select attributes for comparison.\nMatching Text Note Types will be grouped for consolidation.\nUnchecked attributes are ignored, meaning types will be consolidated even if those specific values differ.",
                     bulletPoints: TextNoteAttributeCatalog.DisplayNames,
                     credit: credit,
                     showCustomInput: false,

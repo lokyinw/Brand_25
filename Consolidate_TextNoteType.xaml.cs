@@ -39,9 +39,9 @@ namespace Brand_25
 
             int typeCount = duplicateGroups.Sum(g => g.Count);
             int groupCount = duplicateGroups.Count;
-            TitleText.Text = $"Duplicate Text Note Types — {typeCount} types across {groupCount} groups";
+            TitleText.Text = $"Duplicated Text Note Types — {typeCount} types across {groupCount} groups";
             SubtitleText.Text = "Select exactly one survivor per group — shaded rows share a group. " +
-                                 "Grey columns weren't part of the comparison, so those values may differ within a group.";
+                                 "Grey columns are not selected for comparison, so those values may differ within a group.";
             FooterText.Text = credit;
 
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");

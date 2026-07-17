@@ -84,16 +84,16 @@
 
         <Button Content="OK" Width="80" Height="30" Click="CloseDialog"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Bottom"
-                Margin="10 0 0 10"/>
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
+                Margin="30 0 0 10"/>
 
         <!-- Only shown when the caller passes a revealPath into the constructor —
              other WarningLarge usages are unaffected and never see this button. -->
         <Button x:Name="OpenFolderButton" Content="Open Log Folder" Width="140" Height="30"
                 Click="OpenFolder_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Bottom"
-                Margin="100 0 0 10" Visibility="Collapsed"/>
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
+                Margin="130 0 0 10" Visibility="Collapsed"/>
 
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Grid.Row="2" Margin="0 0 10 10" >
             <Image x:Name="brandLogo" Width="150" Height="50"

@@ -89,17 +89,17 @@
         <!-- Footer -->
         <Button Content="OK" Width="80" Height="30" Click="ButtonOk_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
                 Margin="15 0 0 10"/>
 
         <Button Content="Restore" Width="80" Height="30" Click="ButtonRestore_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
                 Margin="105 0 0 10"/>
 
         <Button Content="Cancel" Width="80" Height="30" Click="ButtonCancel_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
                 Margin="195 0 0 10"/>
 
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Grid.Row="2" Margin="0 0 10 10">
