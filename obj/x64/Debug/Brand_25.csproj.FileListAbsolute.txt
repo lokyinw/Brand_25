@@ -73,3 +73,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_SheetLayout.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_SheetLayout.g.cs
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\WarningLarge.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\WarningLarge.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Input_LineWeight.baml
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Input_LineWeight.g.cs

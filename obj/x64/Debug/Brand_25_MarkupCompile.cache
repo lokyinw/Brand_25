@@ -10,11 +10,11 @@ none
 false
 DEBUG;TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 
-12-416297903
+13733631716
 
-33-1939131035
+34-894971051
 200-393887547
-BulletPointSelector.xaml;Consolidate_TextNoteType.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_ElevType.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_ViewPlan.xaml;Warning.xaml;WarningLarge.xaml;
+BulletPointSelector.xaml;Consolidate_TextNoteType.xaml;Input_LineWeight.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_ElevType.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_ViewPlan.xaml;Warning.xaml;WarningLarge.xaml;
 
 False
 

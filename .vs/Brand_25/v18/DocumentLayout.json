@@ -3,12 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\bulletpointselector.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:bulletpointselector.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\input_lineweight.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:input_lineweight.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\bulletpointselector.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:bulletpointselector.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\bulletpointselector.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:bulletpointselector.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\text_consolidatetypes.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -25,10 +33,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\consolidate_textnotetype.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:consolidate_textnotetype.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -38,24 +42,23 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "BulletPointSelector.xaml.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml.cs",
-              "RelativeDocumentMoniker": "BulletPointSelector.xaml.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml.cs",
-              "RelativeToolTip": "BulletPointSelector.xaml.cs",
-              "ViewState": "AgIAAA8AAAAAAAAAAAAqwCcAAAAuAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-17T07:45:39.471Z",
+              "DocumentIndex": 0,
+              "Title": "Input_LineWeight.xaml",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Input_LineWeight.xaml",
+              "RelativeDocumentMoniker": "Input_LineWeight.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Input_LineWeight.xaml",
+              "RelativeToolTip": "Input_LineWeight.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-07-17T09:36:00.615Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "Text_ConsolidateTypes.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Text_ConsolidateTypes.cs",
               "RelativeDocumentMoniker": "Text_ConsolidateTypes.cs",
@@ -63,36 +66,58 @@
               "RelativeToolTip": "Text_ConsolidateTypes.cs",
               "ViewState": "AgIAADAAAAAAAAAAAADwvzwAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-17T06:51:13.435Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-07-17T06:51:13.435Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
               "Title": "BulletPointSelector.xaml",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml",
               "RelativeDocumentMoniker": "BulletPointSelector.xaml",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml",
               "RelativeToolTip": "BulletPointSelector.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-07-17T07:45:16.222Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-07-17T07:45:16.222Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "WarningLarge.xaml",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\WarningLarge.xaml",
               "RelativeDocumentMoniker": "WarningLarge.xaml",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\WarningLarge.xaml",
               "RelativeToolTip": "WarningLarge.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-07-17T06:59:01.337Z",
+              "WhenOpened": "2026-07-17T06:59:01.337Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "App.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
+              "RelativeDocumentMoniker": "App.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
+              "RelativeToolTip": "App.cs",
+              "ViewState": "AgIAAFIAAAAAAAAAAAAcwGEAAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-17T06:29:46.658Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 2,
+              "Title": "BulletPointSelector.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml.cs",
+              "RelativeDocumentMoniker": "BulletPointSelector.xaml.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\BulletPointSelector.xaml.cs",
+              "RelativeToolTip": "BulletPointSelector.xaml.cs",
+              "ViewState": "AgIAABIAAAAAAAAAAAAswCcAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-17T07:45:39.471Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "WarningLarge.xaml.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\WarningLarge.xaml.cs",
               "RelativeDocumentMoniker": "WarningLarge.xaml.cs",
@@ -100,33 +125,18 @@
               "RelativeToolTip": "WarningLarge.xaml.cs",
               "ViewState": "AgIAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-17T06:59:41.917Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-07-17T06:59:41.917Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 7,
               "Title": "Consolidate_TextNoteType.xaml",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Consolidate_TextNoteType.xaml",
               "RelativeDocumentMoniker": "Consolidate_TextNoteType.xaml",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Consolidate_TextNoteType.xaml",
               "RelativeToolTip": "Consolidate_TextNoteType.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-07-17T06:33:31.598Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "App.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeDocumentMoniker": "App.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeToolTip": "App.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAASAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-17T06:29:46.658Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-07-17T06:33:31.598Z"
             }
           ]
         }

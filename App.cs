@@ -93,6 +93,11 @@ namespace Brand_25
             btnData5a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
             panelTest.AddItem(btnData5a);
 
+            PushButtonData btnData5b = new PushButtonData("btn5b", "Elevation\nOutlines", Assembly.GetExecutingAssembly().Location, "Brand_25.Elev_SetOutlineLineWeight");
+            btnData5b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5b.ToolTip = "Test";
+            panelTest.AddItem(btnData5b);
+
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
             PushButton pbHide = sb.AddPushButton(btnData4a);
