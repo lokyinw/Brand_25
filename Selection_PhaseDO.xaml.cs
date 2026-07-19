@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -34,6 +35,17 @@ namespace Brand_25
         public string SelectedDesignOption { get; private set; }
         public MarkTieBreak SelectedTieBreak { get; private set; }
 
+        // Only meaningful when this dialog was constructed with showNumericFields:true
+        // (i.e. the elevation-creation command). Left at their pre-filled defaults if
+        // the numeric fields were never shown.
+        public double SelectedSideExtentMm { get; private set; }
+        public double SelectedTopExtentMm { get; private set; }
+        public double SelectedBottomExtentMm { get; private set; }
+        public double SelectedFarClipOffsetMm { get; private set; }
+        public double SelectedMarkerOffsetMm { get; private set; }
+        public double SelectedMarkerRadius { get; private set; }
+
+        private readonly bool _showNumericFields;
         private List<CheckBox> _tieBreakCheckBoxes = new List<CheckBox>();
 
         public Selection_PhaseDO(
@@ -44,12 +56,20 @@ namespace Brand_25
                 string credit = "Default Warning",
                 string preSelectedPhase = null,
                 string preSelectedDesignOption = null,
-                MarkTieBreak preSelectedTieBreak = MarkTieBreak.SmallerArea)
+                MarkTieBreak preSelectedTieBreak = MarkTieBreak.SmallerArea,
+                bool showNumericFields = false,
+                double sideExtentMm = 300.0,
+                double topExtentMm = 300.0,
+                double bottomExtentMm = -500.0,
+                double farClipOffsetMm = 1500.0,
+                double markerOffsetMm = -1000.0,
+                double markerRadius = 50.0)
         {
             InitializeComponent();
             TitleText.Text = title;
             InstructionText.Text = instruction;
             FooterText.Text = credit;
+            _showNumericFields = showNumericFields;
 
             // Load images
             closeImage.Source = LoadEmbeddedImage("close_32.png");
@@ -69,23 +89,41 @@ namespace Brand_25
                 ? preSelectedDesignOption
                 : designOptions.FirstOrDefault();
 
-            // Build tie-break bullets (single-selection, same pattern as BulletPointSelector)
-            foreach (var option in TieBreakOptions)
+            if (_showNumericFields)
             {
-                CheckBox checkBox = new CheckBox
-                {
-                    Content = option.Label,
-                    Style = (Style)FindResource("CheckBoxStyle"),
-                    IsChecked = option.Value == preSelectedTieBreak
-                };
-                checkBox.Checked += OnTieBreakChecked;
-                _tieBreakCheckBoxes.Add(checkBox);
-                TieBreakPanel.Children.Add(checkBox);
-            }
+                // Elevation-creation mode: numeric crop/marker fields instead of tie-break bullets.
+                // Crop visibility and isolate-in-view are NOT asked here — Win_CreateElevations
+                // always wants the crop line hidden and the element isolated, so there's
+                // nothing for the user to decide.
+                TieBreakContainer.Visibility = Visibility.Collapsed;
+                NumericFieldsContainer.Visibility = Visibility.Visible;
 
-            // Fall back to the first option if nothing matched the pre-selection
-            if (!_tieBreakCheckBoxes.Any(cb => cb.IsChecked == true))
-                _tieBreakCheckBoxes[0].IsChecked = true;
+                SideExtentBox.Text = sideExtentMm.ToString(CultureInfo.InvariantCulture);
+                TopExtentBox.Text = topExtentMm.ToString(CultureInfo.InvariantCulture);
+                BottomExtentBox.Text = bottomExtentMm.ToString(CultureInfo.InvariantCulture);
+                FarClipBox.Text = farClipOffsetMm.ToString(CultureInfo.InvariantCulture);
+                MarkerOffsetBox.Text = markerOffsetMm.ToString(CultureInfo.InvariantCulture);
+                MarkerRadiusBox.Text = markerRadius.ToString(CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                // Tie-break mode (Win_AssignMark): build the bullet selector, same as before.
+                foreach (var option in TieBreakOptions)
+                {
+                    CheckBox checkBox = new CheckBox
+                    {
+                        Content = option.Label,
+                        Style = (Style)FindResource("CheckBoxStyle"),
+                        IsChecked = option.Value == preSelectedTieBreak
+                    };
+                    checkBox.Checked += OnTieBreakChecked;
+                    _tieBreakCheckBoxes.Add(checkBox);
+                    TieBreakPanel.Children.Add(checkBox);
+                }
+
+                if (!_tieBreakCheckBoxes.Any(cb => cb.IsChecked == true))
+                    _tieBreakCheckBoxes[0].IsChecked = true;
+            }
         }
 
         private void OnTieBreakChecked(object sender, RoutedEventArgs e)
@@ -133,12 +171,45 @@ namespace Brand_25
             SelectedPhase = PhaseComboBox.SelectedItem as string;
             SelectedDesignOption = DesignOptionComboBox.SelectedItem as string;
 
-            CheckBox selected = _tieBreakCheckBoxes.FirstOrDefault(cb => cb.IsChecked == true);
-            int index = selected != null ? _tieBreakCheckBoxes.IndexOf(selected) : 0;
-            SelectedTieBreak = TieBreakOptions[index].Value;
+            if (_showNumericFields)
+            {
+                if (!TryParseNumericFields())
+                    return; // validation failed — a message box was already shown, keep the dialog open
+            }
+            else
+            {
+                CheckBox selected = _tieBreakCheckBoxes.FirstOrDefault(cb => cb.IsChecked == true);
+                int index = selected != null ? _tieBreakCheckBoxes.IndexOf(selected) : 0;
+                SelectedTieBreak = TieBreakOptions[index].Value;
+            }
 
             DialogResult = true;
             Close();
+        }
+
+        private bool TryParseNumericFields()
+        {
+            (string label, TextBox box, Action<double> assign)[] fields =
+            {
+                ("Side Extent", SideExtentBox, v => SelectedSideExtentMm = v),
+                ("Top Extent", TopExtentBox, v => SelectedTopExtentMm = v),
+                ("Bottom Extent", BottomExtentBox, v => SelectedBottomExtentMm = v),
+                ("Far Clip Offset", FarClipBox, v => SelectedFarClipOffsetMm = v),
+                ("Marker Offset", MarkerOffsetBox, v => SelectedMarkerOffsetMm = v),
+                ("Marker Circle Scale", MarkerRadiusBox, v => SelectedMarkerRadius = v),
+            };
+
+            foreach (var field in fields)
+            {
+                if (!double.TryParse(field.box.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+                {
+                    MessageBox.Show($"\"{field.label}\" must be a number.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return false;
+                }
+                field.assign(value);
+            }
+
+            return true;
         }
     }
 }

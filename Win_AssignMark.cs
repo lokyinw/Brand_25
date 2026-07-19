@@ -31,9 +31,22 @@ namespace Brand_25
         {
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
+            string credit = "Last Modified by Lok on 2026-07-20. Beta 0.10";
 
             // ---------------- Phase / Design Option / tie-break dialog ----------------
-            List<string> phaseNames = doc.Phases.Cast<Phase>().Select(p => p.Name).ToList();
+            // Ordered by sequence so "latest phase" fallbacks make sense, and so the
+            // combo box reads top-to-bottom in construction order rather than A-Z.
+            List<Phase> phaseElements = doc.Phases.Cast<Phase>()
+                .OrderBy(p => p.get_Parameter(BuiltInParameter.PHASE_SEQUENCE_NUMBER)?.AsInteger() ?? 0)
+                .ToList();
+            List<string> phaseNames = phaseElements.Select(p => p.Name).ToList();
+
+            // Default to "New Construction" rather than whatever sorts/sequences first
+            // (usually "Existing" — rarely what's wanted here). Falls back to the
+            // latest phase if "New Construction" isn't in this project.
+            string preSelectedPhase = phaseNames.Contains("New Construction")
+                ? "New Construction"
+                : phaseNames.LastOrDefault();
 
             List<string> designOptionNames = new List<string> { "Main Model" };
             designOptionNames.AddRange(
@@ -49,11 +62,12 @@ namespace Brand_25
             );
 
             var dlg = new Selection_PhaseDO(
-                "Assign Mark",
+                "Assign Window Mark",
                 "Select Phase, Design Option, and naming rule:",
                 phaseNames,
                 designOptionNames,
-                "Brand_25 \u2013 Assign Mark");
+                credit,
+                preSelectedPhase: preSelectedPhase);
 
             if (dlg.ShowDialog() != true)
                 return Result.Cancelled;
@@ -61,10 +75,10 @@ namespace Brand_25
             string selectedDesignOption = dlg.SelectedDesignOption;
             MarkTieBreak tieBreak = dlg.SelectedTieBreak;
 
-            Phase phase = doc.Phases.Cast<Phase>().FirstOrDefault(p => p.Name == dlg.SelectedPhase);
+            Phase phase = phaseElements.FirstOrDefault(p => p.Name == dlg.SelectedPhase);
             if (phase == null)
             {
-                new Warning("Assign Mark", "Selected Phase could not be found.", "Brand_25 \u2013 Assign Mark").ShowDialog();
+                new Warning("Assign Window Mark", "Selected Phase could not be found.", "Brand_25 \u2013 Assign Mark").ShowDialog();
                 return Result.Failed;
             }
             ElementId phaseId = phase.Id;
@@ -123,14 +137,14 @@ namespace Brand_25
                 t.Commit();
             }
 
-            new Warning("Assign Mark",
+            new WarningLarge("Assign Window Mark",
                 $"Rooms found in selected phase: {roomsInPhase.Count}\n" +
                 $"Windows processed: {windowTargets.Count}\n" +
                 $"Doors processed: {doorTargets.Count}\n" +
                 $"Elements skipped (geometry issue): {skipped.Count}\n" +
                 $"Ambiguous room hits (point matched >1 room): {ambiguousCount}\n" +
                 $"Elements missing BA_Mark parameter (Mark still set): {baMarkMissingCount}",
-                "Brand_25 \u2013 Assign Mark").ShowDialog();
+                credit).ShowDialog();
 
             return Result.Succeeded;
         }

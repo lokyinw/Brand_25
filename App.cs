@@ -71,6 +71,7 @@ namespace Brand_25
             panel3.AddItem(btnData3b);
             panel3.AddItem(btnData3c);
             panel3.AddItem(btnData3d);
+            
 
             RibbonPanel panel4 = application.CreateRibbonPanel(tabName, "Text");
             PushButtonData btnData4a = new PushButtonData("btn4a", "Hide\nMark-ups", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_HideTemp");
@@ -85,16 +86,20 @@ namespace Brand_25
             panel4.AddItem(btnData4c);
 
             RibbonPanel panel5 = application.CreateRibbonPanel(tabName, "Windows");
-            PushButtonData btnDataAssignMark = new PushButtonData("btnAssignMark", "Assign\nWindow/Door Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
-            btnDataAssignMark.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnDataAssignMark.ToolTip = "Assigns Mark/BA_Mark to windows and doors based on the room(s) they sit between.";
-            panel5.AddItem(btnDataAssignMark); // or wherever you'd like it to live
+            PushButtonData btnData5a = new PushButtonData("btnAssignMark", "Assign\nWindow Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
+            PushButtonData btnData5b = new PushButtonData("btn3e", "Create\nWindow Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_CreateElevations");
+            btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5a.ToolTip = "Assigns Mark/BA_Mark to windows and doors based on the room(s) they sit between.";
+            btnData5b.ToolTip = "Create Elevations for Aluminium Windows and Doors";
+            panel5.AddItem(btnData5a);
+            panel5.AddItem(btnData5b);
 
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
-            PushButtonData btnData5a = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
-            btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnData5a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
-            panelTest.AddItem(btnData5a);
+            PushButtonData btnDatatesta = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
+            btnDatatesta.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnDatatesta.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
+            panelTest.AddItem(btnDatatesta);
 
             //PushButtonData btnDataTestPhaseDO = new PushButtonData("btnTestPhaseDO", "Test Phase/DO\nSelector", Assembly.GetExecutingAssembly().Location, "Brand_25.Test_SelectionPhaseDO");
             //btnDataTestPhaseDO.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
