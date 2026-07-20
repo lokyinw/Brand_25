@@ -4,6 +4,7 @@ using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -23,6 +24,7 @@ namespace Brand_25
     public class Win_CreateElevations : IExternalCommand
     {
         private const double MmToFt = 1.0 / 304.8;
+        private const double MmPerFt = 304.8;
 
         // One element (window or door) queued up for elevation creation.
         private class ElevationTarget
@@ -164,11 +166,11 @@ namespace Brand_25
 
                 List<ElevationTarget> windowTargets = BuildWindowTargets(curtainWalls, issues);
                 List<ElevationTarget> doorTargets = BuildDoorTargets(alDoors, issues);
-
-                AssignDedupedViewNames(windowTargets, "Window Elevation");
-                AssignDedupedViewNames(doorTargets, "Door Elevation");
-
                 List<ElevationTarget> allTargets = windowTargets.Concat(doorTargets).ToList();
+
+                // View name is the Mark, and nothing else — deduped across windows and
+                // doors together, since Revit view names must be unique project-wide.
+                AssignDedupedViewNames(allTargets);
 
                 int created = 0;
 
@@ -196,7 +198,14 @@ namespace Brand_25
                             continue;
                         }
 
-                        double floorZ = (target.BaseLevel?.Elevation ?? 0.0) + target.BaseOffsetFt;
+                        // Use the element's OWN real geometric Z (its location curve/point),
+                        // not Level.Elevation — matching the Dynamo graph exactly, which
+                        // built the crop baseline from Curve.StartPoint/EndPoint of the
+                        // wall itself and never queried the Level object for height at all.
+                        // Level.Elevation and true wall geometry Z can disagree in a project
+                        // (e.g. Survey Point offsets); the wall's own location curve Z is
+                        // never wrong, since it's the element's literal real position.
+                        double floorZ = target.Midpoint.Z + target.BaseOffsetFt;
 
                         XYZ testPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, floorZ + 1000.0 * MmToFt);
                         Room hostRoom = FindHostingRoom(testPoint, roomsInPhase, label, issues);
@@ -276,14 +285,23 @@ namespace Brand_25
                         // Room_CreateIntElev.cs's room-fitted crop editing doesn't apply here.
                         double halfWidthFt = target.HalfWidthFt + sideExtentFt;
 
-                        // Crop curve Z values are relative to the view's associated LEVEL,
-                        // not absolute world Z (confirmed by testing), and are measured from
-                        // the LEVEL LINE itself — not from the wall's own Base Offset. The
-                        // marker point / room test above still correctly use absolute floorZ
-                        // (which does include BaseOffsetFt, since that's genuine world
-                        // geometry); it's only the crop CurveLoop that excludes it.
-                        double cropBottomZ = bottomExtentFt;
-                        double cropTopZ = target.UnconnectedHeightFt + topExtentFt;
+                        // Crop Z is absolute world Z, built from the element's OWN location
+                        // curve/point (target.Midpoint.Z via floorZ above) — matching the
+                        // Dynamo graph, which never referenced Level.Elevation for this at
+                        // all. GetCropShape() confirmed SetCropShape() stores whatever world
+                        // Z we give it verbatim, with no transform.
+                        double cropBottomZ = floorZ + bottomExtentFt;
+                        double cropTopZ = floorZ + target.UnconnectedHeightFt + topExtentFt;
+
+                        double levelElevationMm = (target.BaseLevel?.Elevation ?? 0.0) * MmPerFt;
+                        double wallGeometryZMm = target.Midpoint.Z * MmPerFt;
+                        log.AppendLine($"{label}: Level='{target.BaseLevel?.Name}' (Elevation {levelElevationMm:F1} mm), " +
+                            $"wall geometry Z={wallGeometryZMm:F1} mm (discrepancy={wallGeometryZMm - levelElevationMm:F1} mm), " +
+                            $"BaseOffset={target.BaseOffsetFt * MmPerFt:F1} mm, " +
+                            $"UnconnectedHeight={target.UnconnectedHeightFt * MmPerFt:F1} mm");
+                        log.AppendLine($"  Requested crop (absolute world Z, from wall geometry): " +
+                            $"bottom={cropBottomZ * MmPerFt:F1} mm, top={cropTopZ * MmPerFt:F1} mm");
+
                         try
                         {
                             XYZ p0 = target.Midpoint - target.WidthDir * halfWidthFt;
@@ -303,6 +321,40 @@ namespace Brand_25
                             ViewCropRegionShapeManager cropManager = view.GetCropRegionShapeManager();
                             cropManager.SetCropShape(loop);
                             view.CropBoxActive = true;
+                            doc.Regenerate(); // required before GetCropShape()/CropBox reflect the shape we just set
+
+                            // Read back what Revit actually stored, for comparison against
+                            // what we requested above — the key diagnostic for tracking down
+                            // the remaining top/bottom discrepancy.
+                            IList<CurveLoop> actualLoops = cropManager.GetCropShape();
+                            if (actualLoops != null && actualLoops.Count > 0)
+                            {
+                                foreach (Curve c in actualLoops[0])
+                                {
+                                    XYZ pt = c.GetEndPoint(0);
+                                    log.AppendLine($"  Actual crop vertex (world, mm): " +
+                                        $"X={pt.X * MmPerFt:F1}, Y={pt.Y * MmPerFt:F1}, Z={pt.Z * MmPerFt:F1}");
+                                }
+                            }
+                            else
+                            {
+                                log.AppendLine("  GetCropShape() returned no loops after regenerate.");
+                            }
+
+                            // NOTE: for a ViewSection's local CropBox, Z is the view's DEPTH
+                            // axis (near/far clip — Min.Z here matches -FarClipOffset, not our
+                            // top/bottom setting), and Y is the actual vertical axis. Logging
+                            // all three so nothing is assumed.
+                            BoundingBoxXYZ cropBox = view.CropBox;
+                            if (cropBox != null)
+                            {
+                                log.AppendLine($"  view.CropBox (local, mm): " +
+                                    $"Min=({cropBox.Min.X * MmPerFt:F1}, {cropBox.Min.Y * MmPerFt:F1}, {cropBox.Min.Z * MmPerFt:F1}), " +
+                                    $"Max=({cropBox.Max.X * MmPerFt:F1}, {cropBox.Max.Y * MmPerFt:F1}, {cropBox.Max.Z * MmPerFt:F1})");
+                                log.AppendLine($"  view.CropBox.Transform.Origin (mm): " +
+                                    $"X={cropBox.Transform.Origin.X * MmPerFt:F1}, Y={cropBox.Transform.Origin.Y * MmPerFt:F1}, Z={cropBox.Transform.Origin.Z * MmPerFt:F1}, " +
+                                    $"BasisX={cropBox.Transform.BasisX}, BasisY={cropBox.Transform.BasisY}, BasisZ={cropBox.Transform.BasisZ}");
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -317,14 +369,19 @@ namespace Brand_25
                     t1.Commit();
                 }
 
+                string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string logPath = Path.Combine(documentsFolder, $"Win_CreateElevations_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                try { File.WriteAllText(logPath, log.ToString()); }
+                catch { /* best-effort — summary dialog still shows without it */ }
+
                 string summary = $"Windows matched: {curtainWalls.Count}\nDoors matched: {alDoors.Count}\n" +
                     $"Elevations created: {created} of {allTargets.Count}";
                 if (issues.Count > 0)
                 {
-                    summary += $"\n\n{issues.Count} issue(s):\n" + string.Join("\n", issues.Take(20));
-                    if (issues.Count > 20) summary += $"\n...and {issues.Count - 20} more.";
+                    summary += $"\n\nIssues: {issues.Count} (see log for details)";
                 }
-                new WarningLarge("Win_CreateElevations", summary, credit).ShowDialog();
+                summary += "\n\nDiagnostic log saved to your Documents folder.";
+                new Warning("Win_CreateElevations", summary, credit).ShowDialog();
 
                 return Result.Succeeded;
             }
@@ -482,7 +539,8 @@ namespace Brand_25
         // Deduped, read-only naming: blanks become "unknown" and repeats get
         // "_Dup.N" appended — mirrors the graph's rename node, but this is only
         // ever applied to the in-memory view name, never written back to Mark.
-        private static void AssignDedupedViewNames(List<ElevationTarget> targets, string suffix)
+        // View name IS the Mark, nothing else appended.
+        private static void AssignDedupedViewNames(List<ElevationTarget> targets)
         {
             HashSet<string> seen = new HashSet<string>();
             int dupCounter = 0;
@@ -498,7 +556,7 @@ namespace Brand_25
                     seen.Add(name);
                 }
 
-                target.ViewName = $"{name} {suffix}";
+                target.ViewName = name;
             }
         }
 
