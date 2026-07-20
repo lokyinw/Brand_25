@@ -77,3 +77,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Input_LineWeight.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Input_LineWeight.g.cs
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_PhaseDO.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_PhaseDO.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_TagTypes.baml
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_TagTypes.g.cs

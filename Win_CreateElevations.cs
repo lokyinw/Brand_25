@@ -39,6 +39,7 @@ namespace Brand_25
             public double UnconnectedHeightFt;
             public string RawMark;
             public string ViewName;          // filled in after dedup
+            public Level LevelToKeepVisible; // window: wall's Base Constraint; door: the door instance's own Level
         }
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
@@ -127,6 +128,34 @@ namespace Brand_25
                 }
                 ViewFamilyType elevationType = elevTypeWindow.SelectedElevType;
 
+                // ---------------- Tag types (curtain wall / window and door) ----------------
+                List<FamilySymbol> wallTagTypes = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_WallTags)
+                    .WhereElementIsElementType()
+                    .Cast<FamilySymbol>()
+                    .ToList();
+                List<FamilySymbol> doorTagTypes = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_DoorTags)
+                    .WhereElementIsElementType()
+                    .Cast<FamilySymbol>()
+                    .ToList();
+
+                FamilySymbol windowTagType = null, doorTagType = null;
+                if (wallTagTypes.Count > 0 || doorTagTypes.Count > 0)
+                {
+                    Selection_TagTypes tagTypeWindow = new Selection_TagTypes(wallTagTypes, doorTagTypes, credit);
+                    if (tagTypeWindow.ShowDialog() != true)
+                    {
+                        return Result.Cancelled;
+                    }
+                    windowTagType = tagTypeWindow.SelectedWindowTagType;
+                    doorTagType = tagTypeWindow.SelectedDoorTagType;
+                }
+                else
+                {
+                    new Warning(credit, "No Wall Tag or Door Tag families are loaded — elevations will be created without tags.", credit).ShowDialog();
+                }
+
                 // ---------------- Rooms in the selected phase (shared by both categories) ----------------
                 List<Room> roomsInPhase = new FilteredElementCollector(doc)
                     .OfCategory(BuiltInCategory.OST_Rooms)
@@ -187,6 +216,9 @@ namespace Brand_25
                 {
                     t1.Start();
 
+                    if (windowTagType != null && !windowTagType.IsActive) windowTagType.Activate();
+                    if (doorTagType != null && !doorTagType.IsActive) doorTagType.Activate();
+
                     foreach (ElevationTarget target in allTargets)
                     {
                         string label = $"{(target.IsDoor ? "Door" : "Window")} (Id {target.HostElement.Id})";
@@ -210,20 +242,39 @@ namespace Brand_25
                         XYZ testPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, floorZ + 1000.0 * MmToFt);
                         Room hostRoom = FindHostingRoom(testPoint, roomsInPhase, label, issues);
 
+                        // The wall's own perpendicular normal — guaranteed exactly
+                        // perpendicular to WidthDir, unlike the raw to-room vector below.
+                        // The crop rectangle is built in the {WidthDir, Z} plane, so the
+                        // view MUST be rotated to face exactly along this normal (or its
+                        // negation) or Revit rejects the crop with "...plane parallel to
+                        // the view plane" and silently falls back to its own default crop
+                        // (this was the root cause of several elevations coming out not
+                        // parallel with their wall — the old code rotated toward the raw,
+                        // not-necessarily-perpendicular, room-center vector instead).
+                        XYZ wallNormal = new XYZ(-target.WidthDir.Y, target.WidthDir.X, 0).Normalize();
+
                         XYZ interiorDirection;
                         if (hostRoom != null)
                         {
                             LocationPoint roomLoc = hostRoom.Location as LocationPoint;
                             XYZ roomPoint = roomLoc?.Point ?? testPoint;
-                            interiorDirection = new XYZ(roomPoint.X - target.Midpoint.X, roomPoint.Y - target.Midpoint.Y, 0).Normalize();
+                            XYZ toRoomRaw = new XYZ(roomPoint.X - target.Midpoint.X, roomPoint.Y - target.Midpoint.Y, 0);
+                            // Only the SIGN of this dot product matters — which of the two
+                            // perpendicular directions actually points toward the room —
+                            // not the raw vector's exact angle. This is also more robust
+                            // than using the raw vector directly, since it only requires the
+                            // room center to be on the correct side, not exactly in front.
+                            interiorDirection = toRoomRaw.DotProduct(wallNormal) >= 0 ? wallNormal : -wallNormal;
                         }
                         else
                         {
                             // Fallback when no room is found at this point/phase — VERIFY
                             // this points the right way in your project. Wall.Orientation
-                            // isn't guaranteed to point exterior for every wall.
+                            // isn't guaranteed to point exterior for every wall, so it's
+                            // only used here to pick a sign, never the exact direction.
                             Wall referenceWall = target.IsDoor ? (target.HostElement as FamilyInstance)?.Host as Wall : target.HostElement as Wall;
-                            interiorDirection = referenceWall != null ? -referenceWall.Orientation : XYZ.BasisX;
+                            XYZ orientationGuess = referenceWall != null ? -referenceWall.Orientation : XYZ.BasisX;
+                            interiorDirection = orientationGuess.DotProduct(wallNormal) >= 0 ? wallNormal : -wallNormal;
                         }
 
                         XYZ markerPoint = target.Midpoint
@@ -277,6 +328,30 @@ namespace Brand_25
                         // on, not user-configurable; there's nothing to decide here.
                         view.CropBoxVisible = false;
                         IsolateElementInView(doc, view, target.HostElement.Id, log);
+                        HideOtherLevels(doc, view, target.LevelToKeepVisible?.Id ?? ElementId.InvalidElementId, log);
+
+                        // Tag the element — position is 4mm (paper space, scaled by the
+                        // view's own print scale) below the level line, horizontally
+                        // centered on the element. Mechanics match the Dynamo graph
+                        // (IndependentTag.Create with a Reference to the host element,
+                        // no leader, horizontal orientation); the position itself is a
+                        // paper-space offset from the level line rather than the graph's
+                        // fixed 200mm-below-own-midpoint, per this project's convention.
+                        FamilySymbol tagType = target.IsDoor ? doorTagType : windowTagType;
+                        if (tagType != null)
+                        {
+                            try
+                            {
+                                double tagOffsetModelFt = (4.0 * view.Scale) * MmToFt; // paper mm -> model mm -> ft
+                                XYZ tagPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, target.Midpoint.Z - tagOffsetModelFt);
+                                IndependentTag.Create(doc, tagType.Id, view.Id, new Reference(target.HostElement),
+                                    false, TagOrientation.Horizontal, tagPoint);
+                            }
+                            catch (Exception ex)
+                            {
+                                log.AppendLine($"  Warning: failed to create tag for '{view.Name}': {ex.Message}");
+                            }
+                        }
 
                         // Crop shape set immediately, same transaction — matches the graph,
                         // which sets it right after rotation with no separate pass. This is
@@ -290,7 +365,14 @@ namespace Brand_25
                         // Dynamo graph, which never referenced Level.Elevation for this at
                         // all. GetCropShape() confirmed SetCropShape() stores whatever world
                         // Z we give it verbatim, with no transform.
-                        double cropBottomZ = floorZ + bottomExtentFt;
+                        // Bottom is measured from the wall's own location-curve baseline
+                        // (target.Midpoint.Z) directly, NOT from floorZ — floorZ includes
+                        // BaseOffsetFt, and the graph's bottom formula is a literal "-500"
+                        // constant that never incorporates Base Offset. Leaking BaseOffsetFt
+                        // into the bottom is exactly what was cropping the level line out for
+                        // clerestory windows (large positive Base Offset pushes the whole
+                        // wall — and with it, the old bottom calc — well above the level).
+                        double cropBottomZ = target.Midpoint.Z + bottomExtentFt;
                         double cropTopZ = floorZ + target.UnconnectedHeightFt + topExtentFt;
 
                         double levelElevationMm = (target.BaseLevel?.Elevation ?? 0.0) * MmPerFt;
@@ -367,6 +449,13 @@ namespace Brand_25
 
                     doc.Regenerate();
                     t1.Commit();
+                }
+
+                if (issues.Count > 0)
+                {
+                    log.AppendLine();
+                    log.AppendLine("=== ISSUES ===");
+                    foreach (string issue in issues) log.AppendLine(issue);
                 }
 
                 string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -469,7 +558,8 @@ namespace Brand_25
                     BaseLevel = GetWallBaseLevel(wall),
                     BaseOffsetFt = baseOffsetFt,
                     UnconnectedHeightFt = unconnectedHeightFt,
-                    RawMark = wall.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? ""
+                    RawMark = wall.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "",
+                    LevelToKeepVisible = GetWallBaseLevel(wall)
                 });
             }
 
@@ -510,7 +600,8 @@ namespace Brand_25
                     BaseLevel = GetWallBaseLevel(hostWall),
                     BaseOffsetFt = baseOffsetFt,
                     UnconnectedHeightFt = unconnectedHeightFt,
-                    RawMark = door.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? ""
+                    RawMark = door.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "",
+                    LevelToKeepVisible = door.Document.GetElement(door.LevelId) as Level
                 });
             }
 
@@ -633,6 +724,32 @@ namespace Brand_25
             {
                 try { view.HideElements(toHide); }
                 catch (Exception ex) { log.AppendLine($"  Warning: failed to isolate element in view '{view.Name}': {ex.Message}"); }
+            }
+        }
+
+        // Keeps only ONE level datum visible in the created elevation — the wall's own
+        // Base Constraint for windows, or the door instance's own Level for doors (per
+        // ElevationTarget.LevelToKeepVisible) — hiding every other level line that
+        // Revit auto-shows because it happens to fall within the crop's vertical range.
+        private static void HideOtherLevels(Document doc, View view, ElementId keepLevelId, StringBuilder log)
+        {
+            List<ElementId> toHide = new List<ElementId>();
+
+            IList<Element> levelsInView = new FilteredElementCollector(doc, view.Id)
+                .OfCategory(BuiltInCategory.OST_Levels)
+                .WhereElementIsNotElementType()
+                .ToElements();
+
+            foreach (Element lvl in levelsInView)
+            {
+                if (lvl.Id == keepLevelId) continue;
+                if (!lvl.IsHidden(view) && lvl.CanBeHidden(view)) toHide.Add(lvl.Id);
+            }
+
+            if (toHide.Count > 0)
+            {
+                try { view.HideElements(toHide); }
+                catch (Exception ex) { log.AppendLine($"  Warning: failed to hide other levels in view '{view.Name}': {ex.Message}"); }
             }
         }
     }
