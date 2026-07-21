@@ -25,8 +25,8 @@ namespace Brand_25
         // Kept in one place so the label <-> enum mapping can't drift out of sync.
         private static readonly (string Label, MarkTieBreak Value)[] TieBreakOptions = new[]
         {
-            ("Smaller Room (Area)", MarkTieBreak.SmallerArea),
-            ("Larger Room (Area)", MarkTieBreak.LargerArea),
+            ("Smaller Room Area", MarkTieBreak.SmallerArea),
+            ("Larger Room Area", MarkTieBreak.LargerArea),
             ("Smaller Room Number", MarkTieBreak.SmallerRoomNumber),
             ("Larger Room Number", MarkTieBreak.LargerRoomNumber),
         };

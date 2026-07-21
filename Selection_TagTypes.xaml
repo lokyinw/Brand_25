@@ -39,13 +39,13 @@
         </Style>
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Calibri"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Foreground" Value="#272727"/>
             <Setter Property="Margin" Value="0 12 0 4"/>
         </Style>
         <Style x:Key="CustomComboBoxStyle" TargetType="ComboBox">
             <Setter Property="FontFamily" Value="Calibri"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Height" Value="28"/>
         </Style>
     </Window.Resources>

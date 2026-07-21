@@ -281,7 +281,7 @@ namespace Brand_25
                             // there's no "outside" to prefer here. Default to +normal as
                             // interior and log it, since this is a genuinely different case
                             // from the exterior-wall scenario this guarantee is meant for.
-                            issues.Add($"{label}: rooms found on both sides (interior partition, not an exterior wall) — no outside to prefer; defaulting.");
+                            // issues.Add($"{label}: rooms found on both sides (interior partition, not an exterior wall) — no outside to prefer; defaulting.");
                             interiorDirection = wallNormal;
                         }
                         else
@@ -500,8 +500,8 @@ namespace Brand_25
                 {
                     summary += $"\n\nIssues: {issues.Count} (see log for details)";
                 }
-                summary += "\n\nDiagnostic log saved to your Documents folder.";
-                new Warning("Win_CreateElevations", summary, credit).ShowDialog();
+                //summary += "\n\nDiagnostic log saved to your Documents folder.";
+                new Warning("Create Window Elevations", summary, credit).ShowDialog();
 
                 return Result.Succeeded;
             }
@@ -752,6 +752,7 @@ namespace Brand_25
                 if (catId == (long)BuiltInCategory.OST_Levels) continue;   // handled by HideOtherLevels
                 if (catId == (long)BuiltInCategory.OST_Rooms) continue;    // spatial, not physical
                 if (catId == (long)BuiltInCategory.OST_MEPSpaces) continue;
+                if (catId == (long)BuiltInCategory.OST_CurtainGridsWall) continue;
 
                 if (!e.IsHidden(view) && e.CanBeHidden(view)) toHide.Add(e.Id);
             }

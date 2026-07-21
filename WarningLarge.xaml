@@ -79,13 +79,13 @@
         <ScrollViewer Grid.Row="1" Margin="10" VerticalScrollBarVisibility="Auto">
             <TextBlock Name="MessageText" TextWrapping="Wrap" TextAlignment="Left"
                        Style="{StaticResource CustomFontStyle}" FontSize="20" Foreground="#272727"
-                       VerticalAlignment="Top" Padding="20, 50, 20, 20"/>
+                       VerticalAlignment="Top" Padding="5, 20, 20, 20"/>
         </ScrollViewer>
 
         <Button Content="OK" Width="80" Height="30" Click="CloseDialog"
                 Style="{StaticResource CustomButtonFontStyle}"
                 HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
-                Margin="30 0 0 10"/>
+                Margin="15 0 0 10"/>
 
         <!-- Only shown when the caller passes a revealPath into the constructor —
              other WarningLarge usages are unaffected and never see this button. -->
