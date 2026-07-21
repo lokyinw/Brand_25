@@ -166,7 +166,7 @@
                         <TextBox x:Name="MarkerOffsetBox" Style="{StaticResource NumericBoxStyle}"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0 0 0 10">
-                        <TextBlock Text="Marker Circle Scale:" Style="{StaticResource NumericLabelStyle}"/>
+                        <TextBlock Text="Drawing Scale:" Style="{StaticResource NumericLabelStyle}"/>
                         <TextBox x:Name="MarkerRadiusBox" Style="{StaticResource NumericBoxStyle}"/>
                     </StackPanel>
                 </StackPanel>

@@ -25,6 +25,7 @@ namespace Brand_25
     {
         private const double MmToFt = 1.0 / 304.8;
         private const double MmPerFt = 304.8;
+        private const double ProbeOffsetFt = 500.0 * MmToFt; // matches Win_AssignMark.cs's own room-side probe distance
 
         // One element (window or door) queued up for elevation creation.
         private class ElevationTarget
@@ -239,9 +240,6 @@ namespace Brand_25
                         // never wrong, since it's the element's literal real position.
                         double floorZ = target.Midpoint.Z + target.BaseOffsetFt;
 
-                        XYZ testPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, floorZ + 1000.0 * MmToFt);
-                        Room hostRoom = FindHostingRoom(testPoint, roomsInPhase, label, issues);
-
                         // The wall's own perpendicular normal — guaranteed exactly
                         // perpendicular to WidthDir, unlike the raw to-room vector below.
                         // The crop rectangle is built in the {WidthDir, Z} plane, so the
@@ -253,25 +251,46 @@ namespace Brand_25
                         // not-necessarily-perpendicular, room-center vector instead).
                         XYZ wallNormal = new XYZ(-target.WidthDir.Y, target.WidthDir.X, 0).Normalize();
 
+                        // Probe BOTH sides of the wall (matching Win_AssignMark.cs's own
+                        // ProbeOffsetFt approach) rather than testing a single point on the
+                        // wall's own centerline — the old single-point test told us nothing
+                        // about which SIDE has a room (a centerline point can fall inside a
+                        // room's boundary essentially at random, depending on whether that
+                        // room's boundary location is set to wall centerline vs face), which
+                        // is why the exterior side wasn't reliably guaranteed before.
+                        XYZ probeBase = new XYZ(target.Midpoint.X, target.Midpoint.Y, floorZ + 1000.0 * MmToFt);
+                        XYZ probePos = probeBase + wallNormal * ProbeOffsetFt;
+                        XYZ probeNeg = probeBase - wallNormal * ProbeOffsetFt;
+
+                        Room roomAtPos = FindHostingRoom(probePos, roomsInPhase, label, issues);
+                        Room roomAtNeg = FindHostingRoom(probeNeg, roomsInPhase, label, issues);
+
                         XYZ interiorDirection;
-                        if (hostRoom != null)
+                        if (roomAtPos != null && roomAtNeg == null)
                         {
-                            LocationPoint roomLoc = hostRoom.Location as LocationPoint;
-                            XYZ roomPoint = roomLoc?.Point ?? testPoint;
-                            XYZ toRoomRaw = new XYZ(roomPoint.X - target.Midpoint.X, roomPoint.Y - target.Midpoint.Y, 0);
-                            // Only the SIGN of this dot product matters — which of the two
-                            // perpendicular directions actually points toward the room —
-                            // not the raw vector's exact angle. This is also more robust
-                            // than using the raw vector directly, since it only requires the
-                            // room center to be on the correct side, not exactly in front.
-                            interiorDirection = toRoomRaw.DotProduct(wallNormal) >= 0 ? wallNormal : -wallNormal;
+                            // Room only on the +normal side -> that's interior, exterior is -normal.
+                            interiorDirection = wallNormal;
+                        }
+                        else if (roomAtNeg != null && roomAtPos == null)
+                        {
+                            interiorDirection = -wallNormal;
+                        }
+                        else if (roomAtPos != null && roomAtNeg != null)
+                        {
+                            // Rooms on BOTH sides (interior partition, not an exterior wall) —
+                            // there's no "outside" to prefer here. Default to +normal as
+                            // interior and log it, since this is a genuinely different case
+                            // from the exterior-wall scenario this guarantee is meant for.
+                            issues.Add($"{label}: rooms found on both sides (interior partition, not an exterior wall) — no outside to prefer; defaulting.");
+                            interiorDirection = wallNormal;
                         }
                         else
                         {
-                            // Fallback when no room is found at this point/phase — VERIFY
-                            // this points the right way in your project. Wall.Orientation
-                            // isn't guaranteed to point exterior for every wall, so it's
-                            // only used here to pick a sign, never the exact direction.
+                            // Fallback when no room is found on either side at this
+                            // point/phase — VERIFY this points the right way in your
+                            // project. Wall.Orientation isn't guaranteed to point exterior
+                            // for every wall, so it's only used here to pick a sign, never
+                            // the exact direction.
                             Wall referenceWall = target.IsDoor ? (target.HostElement as FamilyInstance)?.Host as Wall : target.HostElement as Wall;
                             XYZ orientationGuess = referenceWall != null ? -referenceWall.Orientation : XYZ.BasisX;
                             interiorDirection = orientationGuess.DotProduct(wallNormal) >= 0 ? wallNormal : -wallNormal;
@@ -324,40 +343,21 @@ namespace Brand_25
                         Parameter farClipParam = view.get_Parameter(BuiltInParameter.VIEWER_BOUND_OFFSET_FAR);
                         if (farClipParam != null && !farClipParam.IsReadOnly) farClipParam.Set(farClipOffsetFt);
 
-                        // Crop line hidden and the element isolated in its own view — always
-                        // on, not user-configurable; there's nothing to decide here.
-                        view.CropBoxVisible = false;
-                        IsolateElementInView(doc, view, target.HostElement.Id, log);
-                        HideOtherLevels(doc, view, target.LevelToKeepVisible?.Id ?? ElementId.InvalidElementId, log);
-
-                        // Tag the element — position is 4mm (paper space, scaled by the
-                        // view's own print scale) below the level line, horizontally
-                        // centered on the element. Mechanics match the Dynamo graph
-                        // (IndependentTag.Create with a Reference to the host element,
-                        // no leader, horizontal orientation); the position itself is a
-                        // paper-space offset from the level line rather than the graph's
-                        // fixed 200mm-below-own-midpoint, per this project's convention.
-                        FamilySymbol tagType = target.IsDoor ? doorTagType : windowTagType;
-                        if (tagType != null)
-                        {
-                            try
-                            {
-                                double tagOffsetModelFt = (4.0 * view.Scale) * MmToFt; // paper mm -> model mm -> ft
-                                XYZ tagPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, target.Midpoint.Z - tagOffsetModelFt);
-                                IndependentTag.Create(doc, tagType.Id, view.Id, new Reference(target.HostElement),
-                                    false, TagOrientation.Horizontal, tagPoint);
-                            }
-                            catch (Exception ex)
-                            {
-                                log.AppendLine($"  Warning: failed to create tag for '{view.Name}': {ex.Message}");
-                            }
-                        }
-
                         // Crop shape set immediately, same transaction — matches the graph,
                         // which sets it right after rotation with no separate pass. This is
                         // a brand-new shape built from scratch (not editing an auto-fitted
                         // one), so the "separate transaction" restriction that applies to
                         // Room_CreateIntElev.cs's room-fitted crop editing doesn't apply here.
+                        //
+                        // IMPORTANT: this must happen BEFORE IsolateElementInView/
+                        // HideOtherLevels below — those two both query "what's visible in
+                        // this view right now", and until the crop shape is actually set,
+                        // the view still has Revit's own transient default auto-crop. Doing
+                        // the isolate/hide-levels pass against that transient default (as an
+                        // earlier version of this file did) meant they only ever caught
+                        // whatever happened to be in THAT default region — not the real,
+                        // final crop — which is exactly why isolation and level-hiding were
+                        // inconsistent from one view to the next.
                         double halfWidthFt = target.HalfWidthFt + sideExtentFt;
 
                         // Crop Z is absolute world Z, built from the element's OWN location
@@ -441,6 +441,37 @@ namespace Brand_25
                         catch (Exception ex)
                         {
                             log.AppendLine($"  Warning: failed to set crop shape for view '{view.Name}': {ex.Message}");
+                        }
+
+                        // Crop line hidden and the element isolated in its own view — always
+                        // on, not user-configurable; there's nothing to decide here. Both of
+                        // these now run AFTER the real crop shape above, so they see what the
+                        // view will actually, finally show.
+                        view.CropBoxVisible = false;
+                        IsolateElementInView(doc, view, target.HostElement.Id, log);
+                        HideOtherLevels(doc, view, target.LevelToKeepVisible?.Id ?? ElementId.InvalidElementId, log);
+
+                        // Tag the element — position is 4mm (paper space, scaled by the
+                        // view's own print scale) below the level line, horizontally
+                        // centered on the element. Mechanics match the Dynamo graph
+                        // (IndependentTag.Create with a Reference to the host element,
+                        // no leader, horizontal orientation); the position itself is a
+                        // paper-space offset from the level line rather than the graph's
+                        // fixed 200mm-below-own-midpoint, per this project's convention.
+                        FamilySymbol tagType = target.IsDoor ? doorTagType : windowTagType;
+                        if (tagType != null)
+                        {
+                            try
+                            {
+                                double tagOffsetModelFt = (4.0 * view.Scale) * MmToFt; // paper mm -> model mm -> ft
+                                XYZ tagPoint = new XYZ(target.Midpoint.X, target.Midpoint.Y, target.Midpoint.Z - tagOffsetModelFt);
+                                IndependentTag.Create(doc, tagType.Id, view.Id, new Reference(target.HostElement),
+                                    false, TagOrientation.Horizontal, tagPoint);
+                            }
+                            catch (Exception ex)
+                            {
+                                log.AppendLine($"  Warning: failed to create tag for '{view.Name}': {ex.Message}");
+                            }
                         }
 
                         created++;
@@ -694,30 +725,35 @@ namespace Brand_25
         // ---------------- Isolate element in view (by ElementId, not by matching
         // Mark strings against the view name as the original graph did) ----------------
 
+        // Hides every OTHER physical model element visible in the view — not just a
+        // fixed category whitelist, which was missing things like curtain wall
+        // mullions, floors, roofs, and furniture (exactly why isolation wasn't
+        // complete for every view). CategoryType.Model excludes annotations, tags,
+        // and internal categories automatically; Levels and Rooms/Spaces are
+        // explicitly excluded since they're handled separately (Levels by
+        // HideOtherLevels) or aren't physically "shown" the way built elements are.
         private static void IsolateElementInView(Document doc, ViewSection view, ElementId keepHostId, StringBuilder log)
         {
-            BuiltInCategory[] categories =
-            {
-                BuiltInCategory.OST_Walls, BuiltInCategory.OST_CurtainWallPanels,
-                BuiltInCategory.OST_Doors, BuiltInCategory.OST_Windows,
-                BuiltInCategory.OST_Cornices, BuiltInCategory.OST_Reveals
-            };
-
             List<ElementId> toHide = new List<ElementId>();
 
-            foreach (BuiltInCategory cat in categories)
-            {
-                IList<Element> elems = new FilteredElementCollector(doc, view.Id)
-                    .OfCategory(cat)
-                    .WhereElementIsNotElementType()
-                    .ToElements();
+            IList<Element> elems = new FilteredElementCollector(doc, view.Id)
+                .WhereElementIsNotElementType()
+                .ToElements();
 
-                foreach (Element e in elems)
-                {
-                    if (e.Id == keepHostId) continue;
-                    if (e is FamilyInstance fi && fi.Host != null && fi.Host.Id == keepHostId) continue;
-                    if (!e.IsHidden(view) && e.CanBeHidden(view)) toHide.Add(e.Id);
-                }
+            foreach (Element e in elems)
+            {
+                if (e.Id == keepHostId) continue;
+                if (e is FamilyInstance fi && fi.Host != null && fi.Host.Id == keepHostId) continue;
+
+                Category cat = e.Category;
+                if (cat == null || cat.CategoryType != CategoryType.Model) continue;
+
+                long catId = cat.Id.Value;
+                if (catId == (long)BuiltInCategory.OST_Levels) continue;   // handled by HideOtherLevels
+                if (catId == (long)BuiltInCategory.OST_Rooms) continue;    // spatial, not physical
+                if (catId == (long)BuiltInCategory.OST_MEPSpaces) continue;
+
+                if (!e.IsHidden(view) && e.CanBeHidden(view)) toHide.Add(e.Id);
             }
 
             if (toHide.Count > 0)
