@@ -81,3 +81,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_TagTypes.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_TagTypes.g.cs
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimDistance.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimDistance.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimStyle.baml
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimStyle.g.cs

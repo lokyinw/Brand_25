@@ -16,6 +16,10 @@ namespace Brand_25
         // mm -> feet (Revit's internal length unit)
         private const double MmToFt = 1.0 / 304.8;
 
+        // Fixed cosmetic adjustments for door dimensions hosted in a curtain wall (not user-editable).
+        private const double DoorWidthBelowTopEdgeMm = 9;   // new position for the door width dimension
+        private const double DoorHeightLeftShiftMm = 4;      // post-creation shift for the door height dimension
+
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             UIApplication uiApp = commandData.Application;
@@ -70,6 +74,27 @@ namespace Brand_25
                 double distB = distWindow.Distance2Mm * MmToFt; // mid ring: height tied to Level (when grids present)
                 double distC = distWindow.Distance3Mm * MmToFt; // outer ring: curtain grid width / door width tie
 
+                // Step 2b: dimension style
+                List<DimensionType> dimTypes = new FilteredElementCollector(doc)
+                    .OfClass(typeof(DimensionType))
+                    .Cast<DimensionType>()
+                    .Where(dt => dt.StyleType == DimensionStyleType.Linear)
+                    .OrderBy(dt => dt.Name)
+                    .ToList();
+
+                if (dimTypes.Count == 0)
+                {
+                    TaskDialog.Show("Error", "No linear dimension types found in the document.");
+                    return Result.Cancelled;
+                }
+
+                Selection_DimStyle dimStyleWindow = new Selection_DimStyle(dimTypes, credit);
+                if (dimStyleWindow.ShowDialog() != true || dimStyleWindow.SelectedDimensionType == null)
+                {
+                    return Result.Cancelled;
+                }
+                DimensionType dimType = dimStyleWindow.SelectedDimensionType;
+
                 // Step 3: gather candidate curtain walls & doors once up front
                 List<Wall> allCurtainWalls = new FilteredElementCollector(doc)
                     .OfCategory(BuiltInCategory.OST_Walls)
@@ -111,7 +136,7 @@ namespace Brand_25
                         {
                             try
                             {
-                                DimensionCurtainWallElevation(doc, view, matchingWalls[0], distA, distB, distC, log, issues);
+                                DimensionCurtainWallElevation(doc, view, matchingWalls[0], distA, distB, distC, dimType, log, issues);
                                 wallElevCount++;
                             }
                             catch (Exception ex)
@@ -140,7 +165,7 @@ namespace Brand_25
                         {
                             try
                             {
-                                DimensionDoorOnlyElevation(doc, view, matchingDoors[0], distA);
+                                DimensionDoorOnlyElevation(doc, view, matchingDoors[0], distA, dimType);
                                 doorElevCount++;
                             }
                             catch (Exception ex)
@@ -197,7 +222,7 @@ namespace Brand_25
         // -----------------------------------------------------------------
         // Curtain wall elevation
         // -----------------------------------------------------------------
-        private void DimensionCurtainWallElevation(Document doc, View view, Wall wall, double distA, double distB, double distC,
+        private void DimensionCurtainWallElevation(Document doc, View view, Wall wall, double distA, double distB, double distC, DimensionType dimType,
             StringBuilder log, List<string> issues)
         {
             CurtainGrid grid = wall.CurtainGrid;
@@ -223,6 +248,7 @@ namespace Brand_25
             if (level != null) eH.Append(level.GetPlaneReference());
 
             CurveLoop profileLoop = null;
+            XYZ profileFaceNormal = null;
 
             foreach (GeometryObject obj in wall.get_Geometry(opt))
             {
@@ -251,7 +277,11 @@ namespace Brand_25
                         // Remaining large planar face(s): the wall's elevation "profile" face
                         // (front and back both qualify and give the same in-plane loop shape).
                         IList<CurveLoop> loops = pf.GetEdgesAsCurveLoops();
-                        if (loops.Count > 0) profileLoop = loops[0];
+                        if (loops.Count > 0)
+                        {
+                            profileLoop = loops[0];
+                            profileFaceNormal = pf.FaceNormal; // must offset using the face's own normal, not an arbitrary axis
+                        }
                     }
                 }
             }
@@ -279,9 +309,9 @@ namespace Brand_25
                 }
             }
 
-            CurveLoop loopA = CurveLoop.CreateViaOffset(profileLoop, distA * view.Scale, XYZ.BasisZ);
-            CurveLoop loopB = CurveLoop.CreateViaOffset(profileLoop, distB * view.Scale, XYZ.BasisZ);
-            CurveLoop loopC = CurveLoop.CreateViaOffset(profileLoop, distC * view.Scale, XYZ.BasisZ);
+            CurveLoop loopA = CurveLoop.CreateViaOffset(profileLoop, distA * view.Scale, profileFaceNormal);
+            CurveLoop loopB = CurveLoop.CreateViaOffset(profileLoop, distB * view.Scale, profileFaceNormal);
+            CurveLoop loopC = CurveLoop.CreateViaOffset(profileLoop, distC * view.Scale, profileFaceNormal);
 
             List<Curve> originalCurves = profileLoop.ToList();
             List<Curve> curvesA = loopA.ToList();
@@ -303,12 +333,13 @@ namespace Brand_25
             if (topIndex < 0) throw new InvalidOperationException("Could not identify the top edge of the curtain wall's profile.");
             int sideIndex = (topIndex - 1 + originalCurves.Count) % originalCurves.Count;
 
-            Line lineH = curvesA[topIndex] as Line;   // width dim line, closest ring
+            Line lineH = curvesA[topIndex] as Line;   // closest ring (distA)
             Line lineV = curvesA[sideIndex] as Line;  // height dim line, closest ring
-            Line lineH2 = curvesC[topIndex] as Line;  // width dim line, outer ring (grid ticks / door width)
+            Line lineH2 = curvesC[topIndex] as Line;  // outer ring (distC)
             Line lineV2 = curvesB[sideIndex] as Line; // height dim line, mid ring (level tie)
+            Line topEdgeLine = originalCurves[topIndex] as Line; // un-offset top edge, used to position the door width dimension
 
-            if (lineH == null || lineV == null || lineH2 == null || lineV2 == null)
+            if (lineH == null || lineV == null || lineH2 == null || lineV2 == null || topEdgeLine == null)
                 throw new InvalidOperationException("The curtain wall's elevation profile is not a straight-sided rectangle; this tool only supports rectangular profiles.");
 
             bool hasBaseOffset = (wall.get_Parameter(BuiltInParameter.WALL_BASE_OFFSET)?.AsDouble() ?? 0) != 0;
@@ -322,28 +353,30 @@ namespace Brand_25
             {
                 if (hasUGrids)
                 {
-                    doc.Create.NewDimension(view, lineV, eRefH);  // segmented by U-grid lines
-                    doc.Create.NewDimension(view, lineV2, eH);    // overall, tied to Level
+                    doc.Create.NewDimension(view, lineV, eRefH, dimType);  // segmented by U-grid lines
+                    doc.Create.NewDimension(view, lineV2, eH, dimType);    // overall, tied to Level
                 }
                 else
                 {
-                    doc.Create.NewDimension(view, lineV, eH);     // overall, tied to Level
+                    doc.Create.NewDimension(view, lineV, eH, dimType);     // overall, tied to Level
                 }
             }
             else
             {
-                doc.Create.NewDimension(view, lineV, eRefH);      // sill sits at Level already; no separate Level tie needed
+                doc.Create.NewDimension(view, lineV, eRefH, dimType);      // sill sits at Level already; no separate Level tie needed
             }
 
             // --- Width ---
+            // Overall (un-segmented) width dimension always sits on the furthest/outer ring (distC).
+            // The multi-segment (grid-tied) width dimension sits on the closest ring (distA).
             if (hasVGrids)
             {
-                doc.Create.NewDimension(view, lineH, eRefV);      // overall width
-                doc.Create.NewDimension(view, lineH2, eV);        // segmented by V-grid lines
+                doc.Create.NewDimension(view, lineH2, eRefV, dimType);     // overall width, outer ring
+                doc.Create.NewDimension(view, lineH, eV, dimType);         // segmented by V-grid lines, closest ring
             }
             else
             {
-                doc.Create.NewDimension(view, lineH, eV);         // overall width
+                doc.Create.NewDimension(view, lineH2, eV, dimType);       // overall width (eV == eRefV, no grids), outer ring
             }
 
             // --- Doors hosted in this curtain wall ---
@@ -354,17 +387,27 @@ namespace Brand_25
                 .Where(d => d.Host != null && d.Host.Id == wall.Id)
                 .ToList();
 
-            foreach (FamilyInstance door in hostedDoors)
+            if (hostedDoors.Count > 0)
             {
-                try
+                // Dedicated line for the door width dimension: offset DOWN from the (un-offset) top
+                // edge so it no longer overlaps the multi-segment grid-width dimension.
+                // NOTE: sign of the offset is a best guess (negative = "into" the wall / downward,
+                // matching the outward-positive convention used for loopA/B/C above) — flip if it
+                // ends up above the top edge instead of below it.
+                Line doorWidthLine = (Line)topEdgeLine.CreateOffset(-DoorWidthBelowTopEdgeMm * MmToFt * view.Scale, profileFaceNormal);
+
+                foreach (FamilyInstance door in hostedDoors)
                 {
-                    DimensionDoorInCurtainWall(doc, view, door, wallDir, level, lineH2, distA);
-                }
-                catch (Exception ex)
-                {
-                    string msg = $"View '{view.Name}': error dimensioning door (ID {door.Id}) hosted in curtain wall — {ex.Message}";
-                    log.AppendLine("Error: " + msg);
-                    issues.Add(msg);
+                    try
+                    {
+                        DimensionDoorInCurtainWall(doc, view, door, wallDir, level, doorWidthLine, distA, dimType);
+                    }
+                    catch (Exception ex)
+                    {
+                        string msg = $"View '{view.Name}': error dimensioning door (ID {door.Id}) hosted in curtain wall — {ex.Message}";
+                        log.AppendLine("Error: " + msg);
+                        issues.Add(msg);
+                    }
                 }
             }
         }
@@ -377,14 +420,12 @@ namespace Brand_25
         }
 
         // Door hosted in a curtain wall: width tied to Left/Right (+Centre) reference planes,
-        // reusing the curtain wall's grid-width dimension line; height tied to Level + Top.
-        private void DimensionDoorInCurtainWall(Document doc, View view, FamilyInstance door, XYZ wallDir, Level level, Line widthDimLine, double distA)
+        // on a dedicated line below the top edge; height tied to Level + Top.
+        private void DimensionDoorInCurtainWall(Document doc, View view, FamilyInstance door, XYZ wallDir, Level level, Line widthDimLine, double distA, DimensionType dimType)
         {
             BoundingBoxXYZ bbox = door.get_BoundingBox(view);
             if (bbox == null) throw new InvalidOperationException("Door has no bounding box in this view.");
             XYZ center = bbox.Min + (bbox.Max - bbox.Min) * 0.5;
-
-            XYZ crossDir = wallDir.CrossProduct(XYZ.BasisZ);
 
             Reference leftRef = door.GetReferenceByName("Left");
             Reference rightRef = door.GetReferenceByName("Right");
@@ -394,13 +435,13 @@ namespace Brand_25
             if (leftRef == null || rightRef == null || topRef == null)
                 throw new InvalidOperationException("Door family is missing the Left/Right/Top named reference planes.");
 
-            // Width — placed on the same offset line used for the curtain grid's width dimension.
+            // Width — on its own dedicated line (no longer overlapping the multi-segment grid dimension).
             ReferenceArray widthRefs = new ReferenceArray();
             widthRefs.Append(leftRef);
             widthRefs.Append(rightRef);
             if (centreRef != null) widthRefs.Append(centreRef);
 
-            Dimension widthDim = doc.Create.NewDimension(view, widthDimLine, widthRefs);
+            Dimension widthDim = doc.Create.NewDimension(view, widthDimLine, widthRefs, dimType);
             if (centreRef != null)
             {
                 foreach (DimensionSegment seg in widthDim.Segments) seg.Below = "Door Width";
@@ -410,20 +451,27 @@ namespace Brand_25
                 widthDim.Below = "Door Width";
             }
 
-            // Height — a vertical line offset to the side of the door, tied to Level + Top.
-            Line heightLine = (Line)Line.CreateUnbound(center, XYZ.BasisZ).CreateOffset(distA * view.Scale, crossDir);
+            // Height — a vertical line (direction must be Z to cross the Level/Top horizontal
+            // reference planes), offset sideways along the wall's own run direction.
+            Line heightLine = (Line)Line.CreateUnbound(center, XYZ.BasisZ).CreateOffset(distA * view.Scale, wallDir);
             ReferenceArray heightRefs = new ReferenceArray();
             if (level != null) heightRefs.Append(level.GetPlaneReference());
             heightRefs.Append(topRef);
 
-            Dimension heightDim = doc.Create.NewDimension(view, heightLine, heightRefs);
+            Dimension heightDim = doc.Create.NewDimension(view, heightLine, heightRefs, dimType);
             heightDim.Below = "Door Height";
+
+            // Post-creation shift: move the whole dimension (line + text) left in the view,
+            // using the view's own right-direction so "left" is correct regardless of wallDir's sign.
+            // NOTE: flip the sign here if it moves right instead of left.
+            XYZ leftShift = view.RightDirection.Normalize().Negate() * (DoorHeightLeftShiftMm * MmToFt * view.Scale);
+            ElementTransformUtils.MoveElement(doc, heightDim.Id, leftShift);
         }
 
         // -----------------------------------------------------------------
         // Door-only elevation (no wall matched to the view)
         // -----------------------------------------------------------------
-        private void DimensionDoorOnlyElevation(Document doc, View view, FamilyInstance door, double distA)
+        private void DimensionDoorOnlyElevation(Document doc, View view, FamilyInstance door, double distA, DimensionType dimType)
         {
             Wall hostWall = door.Host as Wall;
             Level level = hostWall != null ? doc.GetElement(hostWall.LevelId) as Level : null;
@@ -434,7 +482,6 @@ namespace Brand_25
             XYZ wallDir = (hostWall?.Location as LocationCurve) is LocationCurve lc
                 ? (lc.Curve.GetEndPoint(1) - lc.Curve.GetEndPoint(0)).Normalize()
                 : XYZ.BasisX;
-            XYZ crossDir = wallDir.CrossProduct(XYZ.BasisZ);
 
             BoundingBoxXYZ bbox = door.get_BoundingBox(view);
             if (bbox == null) throw new InvalidOperationException("Door has no bounding box in this view.");
@@ -446,19 +493,21 @@ namespace Brand_25
             if (leftRef == null || rightRef == null || topRef == null)
                 throw new InvalidOperationException("Door family is missing the Left/Right/Top named reference planes.");
 
-            // Width — horizontal line offset above the door, tied to Left/Right.
-            Line widthLine = (Line)Line.CreateUnbound(center, crossDir).CreateOffset(distA * view.Scale, XYZ.BasisZ);
+            // Width — line direction must be wallDir (parallel to the Left/Right planes' normal),
+            // offset upward above the door.
+            Line widthLine = (Line)Line.CreateUnbound(center, wallDir).CreateOffset(distA * view.Scale, XYZ.BasisZ);
             ReferenceArray widthRefs = new ReferenceArray();
             widthRefs.Append(leftRef);
             widthRefs.Append(rightRef);
-            doc.Create.NewDimension(view, widthLine, widthRefs);
+            doc.Create.NewDimension(view, widthLine, widthRefs, dimType);
 
-            // Height — vertical line offset to the side of the door, tied to Level + Top.
-            Line heightLine = (Line)Line.CreateUnbound(center, XYZ.BasisZ).CreateOffset(distA * view.Scale, crossDir);
+            // Height — vertical line (direction Z, parallel to Level/Top planes' normal),
+            // offset sideways along the wall's own run direction.
+            Line heightLine = (Line)Line.CreateUnbound(center, XYZ.BasisZ).CreateOffset(distA * view.Scale, wallDir);
             ReferenceArray heightRefs = new ReferenceArray();
             heightRefs.Append(level.GetPlaneReference());
             heightRefs.Append(topRef);
-            doc.Create.NewDimension(view, heightLine, heightRefs);
+            doc.Create.NewDimension(view, heightLine, heightRefs, dimType);
         }
     }
 }
