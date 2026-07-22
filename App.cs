@@ -86,14 +86,18 @@ namespace Brand_25
             panel4.AddItem(btnData4c);
 
             RibbonPanel panel5 = application.CreateRibbonPanel(tabName, "Windows");
-            PushButtonData btnData5a = new PushButtonData("btnAssignMark", "Assign\nWindow Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
-            PushButtonData btnData5b = new PushButtonData("btn3e", "Create\nWindow Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_CreateElevations");
+            PushButtonData btnData5a = new PushButtonData("btn5a", "Assign\nWin Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
+            PushButtonData btnData5b = new PushButtonData("btn5b", "Create\nWin Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_CreateElevations");
+            PushButtonData btnData5c = new PushButtonData("btn5c", "Dimension\nWin Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_DimensionElevations");
             btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData5b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData5a.ToolTip = "Assigns Mark/BA_Mark to windows and doors based on the room(s) they sit between.";
             btnData5b.ToolTip = "Create Elevations for Aluminium Windows and Doors";
+            btnData5c.ToolTip = "Tie Dimensions on Window Elevations";
             panel5.AddItem(btnData5a);
             panel5.AddItem(btnData5b);
+            panel5.AddItem(btnData5c);
 
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
             PushButtonData btnDatatesta = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
