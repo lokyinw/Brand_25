@@ -21,7 +21,7 @@ namespace Brand_25
             _credit = credit;
             InitializeComponent();
 
-            TitleText.Text = "Dimension Style";
+            TitleText.Text = "Select Dimension Style";
             FooterText.Text = credit;
 
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");

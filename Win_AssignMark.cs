@@ -142,7 +142,7 @@ namespace Brand_25
                 $"Windows processed: {windowTargets.Count}\n" +
                 $"Doors processed: {doorTargets.Count}\n" +
                 $"Elements skipped (geometry issue): {skipped.Count}\n" +
-                $"Ambiguous room hits (point matched >1 room): {ambiguousCount}\n" +
+                $"Elevation Marker Point located in more than one room: {ambiguousCount}\n" +
                 $"Elements missing BA_Mark parameter (Mark still set): {baMarkMissingCount}",
                 credit).ShowDialog();
 

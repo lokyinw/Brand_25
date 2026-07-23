@@ -55,10 +55,16 @@ namespace Brand_25
         // relative trim amount, so this has a literal, testable meaning on paper.
         public double LevelExtensionMm { get; private set; }
 
-        public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default")
+        // dialogTitle / preferredTypeNameContains let this same dialog be reused by
+        // both Elev_PlaceOnSheets (internal/room elevations) and Win_PlaceElevOnSheets
+        // (window/door elevations) without either one seeing the other's wording or
+        // default-selection bias. Defaults match the original, Elev_PlaceOnSheets-only
+        // behavior exactly, so that command needed no changes at its call site.
+        public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default",
+            string dialogTitle = "Place Internal Elevations on Sheet", string preferredTypeNameContains = "Internal Elevation")
         {
             InitializeComponent();
-            TitleText.Text = "Place Internal Elevations on Sheet";
+            TitleText.Text = dialogTitle;
             FooterText.Text = credit;
 
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");
@@ -90,7 +96,9 @@ namespace Brand_25
 
             List<ViewFamilyType> orderedTypes = elevationTypes.OrderBy(t => t.Name).ToList();
             ViewTypeCombo.ItemsSource = orderedTypes;
-            ViewTypeCombo.SelectedItem = orderedTypes.FirstOrDefault(t => t.Name.IndexOf("Internal Elevation", StringComparison.OrdinalIgnoreCase) >= 0)
+            ViewTypeCombo.SelectedItem = (!string.IsNullOrEmpty(preferredTypeNameContains)
+                    ? orderedTypes.FirstOrDefault(t => t.Name.IndexOf(preferredTypeNameContains, StringComparison.OrdinalIgnoreCase) >= 0)
+                    : null)
                 ?? orderedTypes.FirstOrDefault();
 
             List<Phase> orderedPhases = phases.ToList(); // keep project phase sequence order

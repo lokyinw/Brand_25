@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Brand_25.Selection_DimDistance"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Dimension Line Distances" Height="380" Width="480" WindowStartupLocation="CenterScreen"
+        Title="Dimension Line Distances" Height="350" Width="540" WindowStartupLocation="CenterScreen"
         Background="LightGray" WindowStyle="None">
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="0" CornerRadius="0" CaptionHeight="0"/>
@@ -36,15 +36,15 @@
             <Setter Property="FontWeight" Value="Regular"/>
         </Style>
         <Style x:Key="LabelStyle" TargetType="TextBlock" BasedOn="{StaticResource CustomFontStyle}">
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="Margin" Value="0 0 0 4"/>
         </Style>
         <Style x:Key="InputBoxStyle" TargetType="TextBox">
             <Setter Property="FontFamily" Value="Calibri"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value= "16"/>
             <Setter Property="Width" Value="120"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Padding" Value="2"/>
         </Style>
     </Window.Resources>
     <Grid Margin="0">
@@ -82,18 +82,18 @@
         </Grid>
 
         <!-- Inputs -->
-        <StackPanel Grid.Row="1" Margin="20 20 20 0">
-            <TextBlock Text="All distances are in millimetres, measured in paper space (they are scaled by each view's Scale automatically)."
-                       Style="{StaticResource CustomFontStyle}" FontSize="13" TextWrapping="Wrap" Margin="0 0 0 16" Foreground="#333333"/>
+        <StackPanel Grid.Row="1" Margin="10 20 20 0">
+            <!--<TextBlock Text="All distances are in millimetres, measured in paper space (they are scaled by each view's Scale automatically)."-->
+                       <!--Style="{StaticResource CustomFontStyle}" FontSize="20" TextWrapping="Wrap" Margin="0 0 0 16" Foreground="#333333"/>-->
 
-            <TextBlock Text="Distance 1 — overall width / height dimension (closest to the element)" Style="{StaticResource LabelStyle}"/>
-            <TextBox x:Name="Dist1Box" Style="{StaticResource InputBoxStyle}" Text="7" Margin="0 0 0 14"/>
+            <TextBlock Text="Offset of First tier of dimensions from subject" Style="{StaticResource LabelStyle}"/>
+            <TextBox x:Name="Dist1Box" Style="{StaticResource InputBoxStyle}" Text="7" Margin="0 0 0 5"/>
 
-            <TextBlock Text="Distance 2 — overall height tied to Level (used when curtain grids are present)" Style="{StaticResource LabelStyle}"/>
-            <TextBox x:Name="Dist2Box" Style="{StaticResource InputBoxStyle}" Text="12" Margin="0 0 0 14"/>
+            <TextBlock Text="Offset of Second tier of height dimensions from subject" Style="{StaticResource LabelStyle}"/>
+            <TextBox x:Name="Dist2Box" Style="{StaticResource InputBoxStyle}" Text="12" Margin="0 0 0 5"/>
 
-            <TextBlock Text="Distance 3 — curtain grid width dimension / door width tie (furthest from the element)" Style="{StaticResource LabelStyle}"/>
-            <TextBox x:Name="Dist3Box" Style="{StaticResource InputBoxStyle}" Text="15" Margin="0 0 0 14"/>
+            <TextBlock Text="Offset of Second tier of width dimensions from subject" Style="{StaticResource LabelStyle}"/>
+            <TextBox x:Name="Dist3Box" Style="{StaticResource InputBoxStyle}" Text="15" Margin="0 0 0 5"/>
         </StackPanel>
 
         <!-- Buttons -->

@@ -26,7 +26,7 @@ namespace Brand_25
             _credit = credit;
             InitializeComponent();
 
-            TitleText.Text = "Dimension Line Distances";
+            TitleText.Text = "Set Dimension Line Offset";
             FooterText.Text = credit;
 
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");

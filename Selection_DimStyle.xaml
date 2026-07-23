@@ -71,13 +71,13 @@
         </Grid>
 
         <!-- List -->
-        <Grid Grid.Row="1" Margin="20 20 20 10">
-            <Grid.RowDefinitions>
+        <Grid Grid.Row="1" Margin="10 10 10 10">
+            <!--<Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="Select the dimension style to use for all created dimensions:"
-                       Style="{StaticResource CustomFontStyle}" FontSize="14" TextWrapping="Wrap" Margin="0 0 0 10" Foreground="#333333"/>
+            <TextBlock Grid.Row="0" Text="Select dimension style:"
+                       Style="{StaticResource CustomFontStyle}" FontSize="20" TextWrapping="Wrap" Margin="0 0 0 10" Foreground="#333333"/>-->
             <ListBox x:Name="DimStyleListBox" Grid.Row="1" DisplayMemberPath="Name" FontFamily="Calibri" FontSize="14"/>
         </Grid>
 

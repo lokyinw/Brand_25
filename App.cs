@@ -41,7 +41,6 @@ namespace Brand_25
             btnData1a.ToolTip = "Copy the status of the grids (gridline visibility, gridline extent and bubble visibility) from active view to views selected.\nNote: There is a built-in function in Revit called 'Propagate Extents' in the contextual menu of grids";
             btnData1b.ToolTip = "Toggle Grid Bubble by user. A detail line as fence line is needed.";
             btnData1c.ToolTip = "Trim or Extend grid lines to a detail line created by user.";
-            //btnData1a.ToolTipImage = new BitmapImage(new Uri(path + "\\grid_512.png"));
             panel1.AddItem(btnData1a);
             panel1.AddItem(btnData1b);
             panel1.AddItem(btnData1c);
@@ -89,26 +88,25 @@ namespace Brand_25
             PushButtonData btnData5a = new PushButtonData("btn5a", "Assign\nWin Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
             PushButtonData btnData5b = new PushButtonData("btn5b", "Create\nWin Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_CreateElevations");
             PushButtonData btnData5c = new PushButtonData("btn5c", "Dimension\nWin Elev", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_DimensionElevations");
+            PushButtonData btnData5d = new PushButtonData("btn5d", "Win Elev\non Sheet", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_PlaceElevOnSheets");
             btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData5b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnData5c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5d.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.elev_on_sheet_32.png");
             btnData5a.ToolTip = "Assigns Mark/BA_Mark to windows and doors based on the room(s) they sit between.";
             btnData5b.ToolTip = "Create Elevations for Aluminium Windows and Doors";
             btnData5c.ToolTip = "Tie Dimensions on Window Elevations";
+            btnData5d.ToolTip = "Place window/door elevation views onto a sheet in a row-packed layout, creating additional sheets as needed.";
             panel5.AddItem(btnData5a);
             panel5.AddItem(btnData5b);
             panel5.AddItem(btnData5c);
+            panel5.AddItem(btnData5d);
 
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
             PushButtonData btnDatatesta = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
             btnDatatesta.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnDatatesta.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
             panelTest.AddItem(btnDatatesta);
-
-            //PushButtonData btnDataTestPhaseDO = new PushButtonData("btnTestPhaseDO", "Test Phase/DO\nSelector", Assembly.GetExecutingAssembly().Location, "Brand_25.Test_SelectionPhaseDO");
-            //btnDataTestPhaseDO.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            //btnDataTestPhaseDO.ToolTip = "TEST: opens Selection_PhaseDO populated with the model's real Phases and Design Options, shows the picked values back in a TaskDialog.";
-            //panelTest.AddItem(btnDataTestPhaseDO);
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
@@ -125,15 +123,6 @@ namespace Brand_25
             TextSplitButton = sb;
             HideMarkupsButton = pbHide;
             UnhideMarkupsButton = pbUnhide;
-
-
-            //RibbonPanel panelP = application.CreateRibbonPanel(tabName, "Placeholder");
-            //PushButtonData btnDataP = new PushButtonData("btnP", "Placeholder", Assembly.GetExecutingAssembly().Location, "Brand_25.XxTrial");
-            //btnDataP.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            //btnDataP.ToolTip = "Placeholder";
-            //panelP.AddItem(btnDataP);
-
-
 
             //btnData6.LargeImage = new BitmapImage(new Uri(path + "\\placeholder_32.png"));
             //btnData2a.Image = new BitmapImage(new Uri(path + "\\placeholder_16.png"));

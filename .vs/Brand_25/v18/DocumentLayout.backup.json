@@ -3,6 +3,22 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\input_lineweight.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:input_lineweight.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:selection_sheetlayout.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\warning.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:warning.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -19,14 +35,63 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Input_LineWeight.xaml",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Input_LineWeight.xaml",
+              "RelativeDocumentMoniker": "Input_LineWeight.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Input_LineWeight.xaml",
+              "RelativeToolTip": "Input_LineWeight.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-07-23T01:16:49.483Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Room_CreateIntElev.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
+              "RelativeDocumentMoniker": "Room_CreateIntElev.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
+              "RelativeToolTip": "Room_CreateIntElev.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAgwBUAAABKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-23T01:09:43.987Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Selection_SheetLayout.xaml",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml",
+              "RelativeDocumentMoniker": "Selection_SheetLayout.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Selection_SheetLayout.xaml",
+              "RelativeToolTip": "Selection_SheetLayout.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-07-23T00:16:09.012Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Warning.xaml",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml",
+              "RelativeDocumentMoniker": "Warning.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml",
+              "RelativeToolTip": "Warning.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-07-23T00:09:14.923Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "App.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
               "RelativeDocumentMoniker": "App.cs",
               "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
               "RelativeToolTip": "App.cs",
-              "ViewState": "AgIAAEsAAAAAAAAAAAAiwFkAAABPAAAAAAAAAA==",
+              "ViewState": "AgIAAFIAAAAAAAAAAAAcwH0AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-18T04:31:06.853Z",
+              "WhenOpened": "2026-07-22T11:22:43.984Z",
               "EditorCaption": ""
             }
           ]

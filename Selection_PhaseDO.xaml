@@ -139,7 +139,7 @@
              toggled in code-behind based on the showNumericFields constructor flag. -->
         <Grid Grid.Row="4" Margin="12 0 12 0">
             <StackPanel x:Name="TieBreakContainer">
-                <TextBlock Text="Mark elements after:" Style="{StaticResource ComboBoxLabelStyle}" Margin="5 25 5 5"/>
+                <TextBlock Text="For interior ones, mark elements after the room with:" Style="{StaticResource CustomFontStyle}" FontSize="20" Margin="5 25 5 5"/>
                 <UniformGrid x:Name="TieBreakPanel" Columns="1" Margin="10 0 10 0" VerticalAlignment="Top"/>
             </StackPanel>
 
@@ -178,7 +178,7 @@
         <!-- Action Buttons -->
         <Button Content="OK" Width="80" Height="30" Click="CloseDialog"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="5" VerticalAlignment="Center"
+                HorizontalAlignment="Left" Grid.Row="5" VerticalAlignment="Bottom"
                 Margin="17 0 0 10"/>
 
         <!-- Footer -->

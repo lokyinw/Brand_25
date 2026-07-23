@@ -58,7 +58,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" Background="Transparent" HorizontalAlignment="left" VerticalAlignment="Center">
                 <Image x:Name="icon" Width="25" Height="25" Margin="5 0 0 0"/>
-                <TextBlock Foreground="White" Name="TitleText" Text="Elevation Outline Line Weight" FontSize="16" VerticalAlignment="Center" Margin="10 0 0 0"
+                <TextBlock Foreground="White" Name="TitleText" Text="Cropbox Boundary Line Weight" FontSize="16" VerticalAlignment="Center" Margin="10 0 0 0"
                            Style="{StaticResource CustomFontStyle}"/>
             </StackPanel>
 
@@ -74,33 +74,33 @@
         <StackPanel Grid.Row="1" Margin="15 10 15 0">
             <TextBlock Name="MessageText" TextWrapping="Wrap" TextAlignment="Left"
                        Style="{StaticResource CustomFontStyle}" FontSize="18" Foreground="#272727"
-                       Text="Select the internal elevation view type. Click OK to apply the chosen line weight to their outlines, or Restore to clear existing overrides."
+                       Text="Select the Elevation view type. Click 'OK' to apply line weight to the cropboxes, or 'Restore Default' to clear existing overrides."
                        Margin="0 0 0 15"/>
 
-            <TextBlock Text="Elevation View Type:" Style="{StaticResource CustomFontStyle}" FontSize="14" Foreground="#272727" Margin="0 0 0 4"/>
+            <TextBlock Text="Elevation View Type:" Style="{StaticResource CustomFontStyle}" FontSize="16" Foreground="#272727" Margin="0 0 0 0"/>
             <ComboBox x:Name="ViewTypeCombo" Style="{StaticResource CustomComboFontStyle}"
-                      DisplayMemberPath="Name" Height="30" Margin="0 0 0 20"/>
+                      DisplayMemberPath="Name" Height="26" Margin="0 0 0 10"/>
 
-            <TextBlock Text="Line Weight (1 - 16):" Style="{StaticResource CustomFontStyle}" FontSize="14" Foreground="#272727" Margin="0 0 0 4"/>
+            <TextBlock Text="Line Weight (1 - 16):" Style="{StaticResource CustomFontStyle}" FontSize="16" Foreground="#272727" Margin="0 0 0 0"/>
             <ComboBox x:Name="LineWeightCombo" Style="{StaticResource CustomComboFontStyle}"
-                      Height="30" SelectedIndex="0"/>
+                      Height="26" SelectedIndex="0"/>
         </StackPanel>
 
         <!-- Footer -->
         <Button Content="OK" Width="80" Height="30" Click="ButtonOk_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
                 Margin="15 0 0 10"/>
 
-        <Button Content="Restore" Width="80" Height="30" Click="ButtonRestore_Click"
+        <Button Content="Restore Default" Width="120" Height="30" Click="ButtonRestore_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
                 Margin="105 0 0 10"/>
 
         <Button Content="Cancel" Width="80" Height="30" Click="ButtonCancel_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
-                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"
-                Margin="195 0 0 10"/>
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Top"
+                Margin="235 0 0 10"/>
 
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Grid.Row="2" Margin="0 0 10 10">
             <Image x:Name="brandLogo" Width="150" Height="50"

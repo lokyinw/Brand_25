@@ -13,21 +13,31 @@ namespace Brand_25
     /// </summary>
     public partial class Warning : Window
     {
+        // Optional file or folder to reveal via the "Open Folder" button. Leave it
+        // null (the default) and the button stays hidden — existing calls elsewhere
+        // in the codebase are unaffected.
+        private readonly string _revealPath;
 
         //public Warning(string title, string message)
-        public Warning(string title, string message, string footerText = "Default Warning")
+        public Warning(string title, string message, string footerText = "Default Warning",
+                        double messageFontSize = 20, string revealPath = null)
 
         {
             InitializeComponent();
             MessageText.Text = message;
+            MessageText.FontSize = messageFontSize;
             TitleText.Text = title;
             FooterText.Text = footerText;  // Set footer text dynamically
+            _revealPath = revealPath;
 
             //minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");
             //maximizeImage.Source = LoadEmbeddedImage("maximize_32.png");
             closeImage.Source = LoadEmbeddedImage("close_32.png");
             brandLogo.Source = LoadEmbeddedImage("Brand_logo.png");
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
+
+            if (!string.IsNullOrEmpty(_revealPath))
+                OpenFolderButton.Visibility = Visibility.Visible;
 
             //string fontPath = ExtractEmbeddedFont("Brand_25.Resources.Fonts.Moogalator.ttf");
             //MessageText.FontFamily = LoadFontFromFile(fontPath);
@@ -89,6 +99,25 @@ namespace Brand_25
         {
             this.DialogResult = true; // Properly closes the dialog
             this.Close();
+        }
+
+        private void OpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_revealPath)) return;
+
+            try
+            {
+                if (File.Exists(_revealPath))
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_revealPath}\"");
+                else if (Directory.Exists(_revealPath))
+                    System.Diagnostics.Process.Start("explorer.exe", $"\"{_revealPath}\"");
+                else
+                    new Warning("Not Found", $"Could not find:\n{_revealPath}", "Warning").ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                new Warning("Could Not Open Folder", ex.Message, "Warning").ShowDialog();
+            }
         }
 
 

@@ -19,7 +19,7 @@ namespace Brand_25
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2025-03-30. Beta 0.70";
+            string credit = "Last Modified by Lok on 2026-07-22. Beta 0.71";
 
             // Create a StringBuilder to log details
             StringBuilder log = new StringBuilder();

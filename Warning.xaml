@@ -76,6 +76,9 @@
             </StackPanel>
         </Grid>
 
+        <!-- FontSize is a design-time default (20) — overridden in code-behind from the
+             optional messageFontSize constructor parameter, so existing call sites that
+             don't pass it keep this exact look. -->
         <TextBlock Name="MessageText" TextWrapping="Wrap" TextAlignment="Left" Grid.Row="1"
                    Style="{StaticResource CustomFontStyle}" FontSize="20" Foreground="#272727"
                    Margin="10" VerticalAlignment="Top"/>
@@ -85,6 +88,14 @@
                 Style="{StaticResource CustomButtonFontStyle}"
                 HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Bottom"
                 Margin="10 0 0 10"/>
+
+        <!-- Hidden by default — only shown when the calling script passes a non-empty
+             revealPath into the constructor, so existing callers see no change. -->
+        <Button x:Name="OpenFolderButton" Content="Open Folder" Width="110" Height="30"
+                Click="OpenFolder_Click"
+                Style="{StaticResource CustomButtonFontStyle}"
+                HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Bottom"
+                Margin="100 0 0 10" Visibility="Collapsed"/>
 
         <StackPanel Orientation="Vertical" HorizontalAlignment="Right" Grid.Row="2" Margin="0 0 10 10" >
             <Image x:Name="brandLogo" Width="150" Height="50" 
@@ -96,4 +107,3 @@
         </StackPanel>
     </Grid>
 </Window>
-
