@@ -2,7 +2,9 @@
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Brand_25
@@ -23,7 +25,7 @@ namespace Brand_25
                              string revealPath = null)
         {
             InitializeComponent();
-            MessageText.Text = message;
+            SetMessage(message, revealPath);
             TitleText.Text = title;
             FooterText.Text = footerText;
             _revealPath = revealPath;
@@ -36,6 +38,25 @@ namespace Brand_25
 
             if (!string.IsNullOrEmpty(_revealPath))
                 OpenFolderButton.Visibility = Visibility.Visible;
+        }
+
+        // Builds MessageText via Inlines (rather than a plain Text assignment) so the
+        // reveal path, when supplied, can be appended underneath the main message in a
+        // much smaller, muted font - without needing any changes to the XAML.
+        private void SetMessage(string message, string revealPath)
+        {
+            MessageText.Inlines.Clear();
+            MessageText.Inlines.Add(new Run(message));
+
+            if (!string.IsNullOrEmpty(revealPath))
+            {
+                MessageText.Inlines.Add(new LineBreak());
+                MessageText.Inlines.Add(new Run(revealPath)
+                {
+                    FontSize = 12,
+                    Foreground = Brushes.DimGray
+                });
+            }
         }
 
         private BitmapImage LoadEmbeddedImage(string imageName)

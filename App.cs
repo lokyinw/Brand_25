@@ -97,6 +97,10 @@ namespace Brand_25
             btnData5b.ToolTip = "Create Elevations for Aluminium Windows and Doors";
             btnData5c.ToolTip = "Tie Dimensions on Window Elevations";
             btnData5d.ToolTip = "Place window/door elevation views onto a sheet in a row-packed layout, creating additional sheets as needed.";
+            PushButtonData btnData5e = new PushButtonData("btn5e", "Tag\nWin/Doors", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_TagAll");
+            btnData5e.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData5e.ToolTip = "Tags every curtain wall (BA_TypeFilter = CW) and every door visible in the active view.";
+            panel5.AddItem(btnData5e);
             panel5.AddItem(btnData5a);
             panel5.AddItem(btnData5b);
             panel5.AddItem(btnData5c);

@@ -4,6 +4,7 @@ using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -15,6 +16,12 @@ namespace Brand_25
         private const double MmToFt = 1.0 / 304.8;
         private const double ProbeOffsetFt = 500.0 * MmToFt;   // 500mm out from centerline
         private const double ProbeHeightFt = 50.0 * MmToFt;    // 50mm up from base offset
+
+        // Log of notable elements written to a text file at the end of Execute():
+        // elements with unresolvable geometry, ambiguous room hits, missing BA_Mark,
+        // and elements whose location curve isn't a straight Line.
+        private static readonly List<string> DebugLog = new List<string>();
+        private static readonly List<string> NonLineElements = new List<string>();
 
         // Per-element working data carried from geometry through naming.
         private class MarkTarget
@@ -32,6 +39,9 @@ namespace Brand_25
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
             string credit = "Last Modified by Lok on 2026-07-20. Beta 0.10";
+
+            DebugLog.Clear();        // reset per run since these are static
+            NonLineElements.Clear();
 
             // ---------------- Phase / Design Option / tie-break dialog ----------------
             // Ordered by sequence so "latest phase" fallbacks make sense, and so the
@@ -137,14 +147,38 @@ namespace Brand_25
                 t.Commit();
             }
 
-            new WarningLarge("Assign Window Mark",
+            // Log: skipped/ambiguous/missing-BA_Mark/non-Line entries recorded above.
+            // Written to a text file so the dialog itself can stay short.
+            DebugLog.Add(
+                $"[Summary] Elements skipped (geometry issue): {skipped.Count}, " +
+                $"Elevation Marker Point located in more than one room: {ambiguousCount}, " +
+                $"Elements missing BA_Mark parameter (Mark still set): {baMarkMissingCount}, " +
+                $"Elements with non-Line location curve: {NonLineElements.Count}");
+
+            string logPath = Path.Combine(Path.GetTempPath(), $"Win_AssignMark_Log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            string logWriteError = null;
+            try
+            {
+                File.WriteAllLines(logPath, DebugLog);
+            }
+            catch (Exception ex)
+            {
+                logWriteError = ex.Message;
+            }
+
+            bool hasIssues = skipped.Count > 0 || ambiguousCount > 0/* || baMarkMissingCount > 0*/;
+            bool hasNonLineElements = NonLineElements.Count > 0;
+
+            string summaryMessage =
                 $"Rooms found in selected phase: {roomsInPhase.Count}\n" +
                 $"Windows processed: {windowTargets.Count}\n" +
                 $"Doors processed: {doorTargets.Count}\n" +
-                $"Elements skipped (geometry issue): {skipped.Count}\n" +
-                $"Elevation Marker Point located in more than one room: {ambiguousCount}\n" +
-                $"Elements missing BA_Mark parameter (Mark still set): {baMarkMissingCount}",
-                credit).ShowDialog();
+                (hasNonLineElements ? $"{NonLineElements.Count} non-straight element(s) found.\n" : "") +
+                (hasIssues ? "ISSUES founded - see log\n" : "") +
+                (logWriteError != null ? $"Log FAILED to write: {logWriteError}" : "");
+
+            new WarningLarge("Assign Window Mark", summaryMessage, credit,
+                revealPath: logWriteError == null ? logPath : null).ShowDialog();
 
             return Result.Succeeded;
         }
@@ -199,7 +233,9 @@ namespace Brand_25
                 Line centerline = isDoor ? GetDoorCenterline(e as FamilyInstance) : GetWallCenterline(e);
                 if (centerline == null)
                 {
-                    skipped.Add($"{e.Category?.Name} {e.Id}: could not resolve a centerline");
+                    string reason = $"{e.Category?.Name} {e.Id}: could not resolve a centerline";
+                    skipped.Add(reason);
+                    DebugLog.Add($"[Skipped] {reason}");
                     continue;
                 }
 
@@ -222,8 +258,8 @@ namespace Brand_25
                     Probe2 = mpt50 + nor.Negate().Multiply(ProbeOffsetFt)
                 };
 
-                target.RoomA = FindRoomForPoint(target.Probe1, roomsInPhase, ref ambiguousCount);
-                target.RoomB = FindRoomForPoint(target.Probe2, roomsInPhase, ref ambiguousCount);
+                target.RoomA = FindRoomForPoint(target.Probe1, roomsInPhase, ref ambiguousCount, $"{(isDoor ? "Door" : "Wall")} {e.Id} Probe1");
+                target.RoomB = FindRoomForPoint(target.Probe2, roomsInPhase, ref ambiguousCount, $"{(isDoor ? "Door" : "Wall")} {e.Id} Probe2");
 
                 targets.Add(target);
             }
@@ -234,7 +270,29 @@ namespace Brand_25
         private static Line GetWallCenterline(Element wall)
         {
             LocationCurve loc = wall.Location as LocationCurve;
-            return loc?.Curve as Line;
+            Curve curve = loc?.Curve;
+            if (curve == null) return null;
+
+            if (!(curve is Line))
+            {
+                string note = $"{wall.Category?.Name} {wall.Id}: location curve is {curve.GetType().Name}, not Line";
+                NonLineElements.Add(note);
+                DebugLog.Add($"[Non-Line Centerline] {note}");
+            }
+
+            // Derive a straight line from the curve so arced (or otherwise non-linear)
+            // walls aren't skipped. Center the line on the curve's true midpoint (e.g.
+            // the arc's midpoint), and orient it along the curve's true tangent direction
+            // at that midpoint - not the chord direction - so the perpendicular offset
+            // used downstream for probe points is correct even for arced walls. Length
+            // is kept equal to the chord length (endpoint to endpoint).
+            XYZ p0 = curve.GetEndPoint(0);
+            XYZ p1 = curve.GetEndPoint(1);
+            double halfLength = p0.DistanceTo(p1) / 2.0;
+            XYZ trueMidpoint = curve.Evaluate(0.5, true);
+            XYZ tangent = curve.ComputeDerivatives(0.5, true).BasisX.Normalize();
+
+            return Line.CreateBound(trueMidpoint - tangent.Multiply(halfLength), trueMidpoint + tangent.Multiply(halfLength));
         }
 
         private static Line GetDoorCenterline(FamilyInstance door)
@@ -261,23 +319,26 @@ namespace Brand_25
             return hostLoc?.Curve as Line;
         }
 
-        private static Room FindRoomForPoint(XYZ pt, List<Room> roomsInPhase, ref int ambiguousCount)
+        private static Room FindRoomForPoint(XYZ pt, List<Room> roomsInPhase, ref int ambiguousCount, string context)
         {
             Room found = null;
-            bool ambiguous = false;
+            List<Room> matches = new List<Room>();
 
             foreach (Room r in roomsInPhase)
             {
                 if (r.IsPointInRoom(pt))
                 {
-                    if (found == null)
-                        found = r;
-                    else
-                        ambiguous = true;
+                    if (found == null) found = r;
+                    matches.Add(r);
                 }
             }
 
-            if (ambiguous) ambiguousCount++;
+            if (matches.Count > 1)
+            {
+                ambiguousCount++;
+                DebugLog.Add($"[Ambiguous] {context} matched rooms: {string.Join(", ", matches.Select(r => r.Number))}");
+            }
+
             return found;
         }
 
@@ -374,6 +435,8 @@ namespace Brand_25
                 baMarkParam.Set(value);
                 return true;
             }
+
+            DebugLog.Add($"[Missing BA_Mark] {e.Category?.Name} {e.Id}: Mark set to \"{value}\", BA_Mark not set (missing or read-only).");
             return false;
         }
     }

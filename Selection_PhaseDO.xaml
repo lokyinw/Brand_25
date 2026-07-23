@@ -122,25 +122,25 @@
                    TextWrapping="Wrap" TextAlignment="Left"
                    Style="{StaticResource CustomFontStyle}"
                    FontSize="20" Foreground="#272727"
-                   Margin="17, 20, 17, 10" VerticalAlignment="Top"/>
+                   Margin="15, 20, 17, 12" VerticalAlignment="Top"/>
 
         <!-- Phase / Design Option Row -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="12 0 12 10">
-            <TextBlock Text="Phase:" Style="{StaticResource ComboBoxLabelStyle}" Width="140"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="10 0 12 10">
+            <TextBlock Text="Phase:" Style="{StaticResource ComboBoxLabelStyle}" Width="150"/>
             <ComboBox x:Name="PhaseComboBox" Style="{StaticResource CustomComboBoxStyle}"/>
         </StackPanel>
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="12 0 12 15">
-            <TextBlock Text="Design Option:" Style="{StaticResource ComboBoxLabelStyle}" Width="140"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="10 0 12 15">
+            <TextBlock Text="Design Option:" Style="{StaticResource ComboBoxLabelStyle}" Width="150"/>
             <ComboBox x:Name="DesignOptionComboBox" Style="{StaticResource CustomComboBoxStyle}"/>
         </StackPanel>
 
         <!-- Mode-specific area: tie-break bullets (Win_AssignMark) OR numeric
              crop/marker fields (elevation creation) — exactly one is visible,
              toggled in code-behind based on the showNumericFields constructor flag. -->
-        <Grid Grid.Row="4" Margin="12 0 12 0">
+        <Grid Grid.Row="4" Margin="10 0 12 0">
             <StackPanel x:Name="TieBreakContainer">
                 <TextBlock Text="For interior ones, mark elements after the room with:" Style="{StaticResource CustomFontStyle}" FontSize="20" Margin="5 25 5 5"/>
-                <UniformGrid x:Name="TieBreakPanel" Columns="1" Margin="10 0 10 0" VerticalAlignment="Top"/>
+                <UniformGrid x:Name="TieBreakPanel" Columns="1" Margin="0 0 10 0" VerticalAlignment="Top"/>
             </StackPanel>
 
             <ScrollViewer x:Name="NumericFieldsContainer" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">

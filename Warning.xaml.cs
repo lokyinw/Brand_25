@@ -3,7 +3,9 @@
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Brand_25
@@ -18,14 +20,13 @@ namespace Brand_25
         // in the codebase are unaffected.
         private readonly string _revealPath;
 
-        //public Warning(string title, string message)
         public Warning(string title, string message, string footerText = "Default Warning",
                         double messageFontSize = 20, string revealPath = null)
 
         {
             InitializeComponent();
-            MessageText.Text = message;
             MessageText.FontSize = messageFontSize;
+            SetMessage(message, revealPath);
             TitleText.Text = title;
             FooterText.Text = footerText;  // Set footer text dynamically
             _revealPath = revealPath;
@@ -42,6 +43,26 @@ namespace Brand_25
             //string fontPath = ExtractEmbeddedFont("Brand_25.Resources.Fonts.Moogalator.ttf");
             //MessageText.FontFamily = LoadFontFromFile(fontPath);
             //TitleText.FontFamily = LoadFontFromFile(fontPath);
+        }
+
+        // Builds MessageText via Inlines (rather than a plain Text assignment) so the
+        // reveal path, when supplied, can be appended underneath the main message in a
+        // much smaller, muted font - without needing any changes to the XAML.
+        private void SetMessage(string message, string revealPath)
+        {
+            MessageText.Inlines.Clear();
+            MessageText.Inlines.Add(new Run(message));
+
+            if (!string.IsNullOrEmpty(revealPath))
+            {
+                MessageText.Inlines.Add(new LineBreak());
+                MessageText.Inlines.Add(new LineBreak());
+                MessageText.Inlines.Add(new Run(revealPath)
+                {
+                    FontSize = 11,
+                    Foreground = Brushes.DimGray
+                });
+            }
         }
         private BitmapImage LoadEmbeddedImage(string imageName)
         {
