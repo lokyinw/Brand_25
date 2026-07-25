@@ -93,7 +93,8 @@ namespace Brand_25
                 Selection_SheetLayout inputWindow = new Selection_SheetLayout(
                     elevationTypes, phases, credit,
                     dialogTitle: "Place Window/Door Elevations on Sheet",
-                    preferredTypeNameContains: PreferredElevationTypeHint);
+                    preferredTypeNameContains: PreferredElevationTypeHint,
+                    defaultSheetNumber: "A190");
                 if (inputWindow.ShowDialog() != true)
                 {
                     return Result.Cancelled;
@@ -232,8 +233,18 @@ namespace Brand_25
                 // Step 7: create any additional sheets the layout needs.
                 List<ViewSheet> sheetList = ElevationSheetLayoutHelper.CreateAdditionalSheets(doc, startingSheet, layout.MaxSheetIndex, log, issues);
 
+                // Step 7.5: if a "No Title" viewport type exists in this project, use it
+                // for every viewport placed by this command — window/door elevation
+                // sheets don't want the usual title/label block under each viewport.
+                // Left null if no such type exists, so PlaceViewportsOnSheets falls back
+                // to whatever type Viewport.Create picks by default (unchanged behavior).
+                ElementId noTitleViewportTypeId = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_Viewports)
+                    .WhereElementIsElementType()
+                    .FirstOrDefault(vt => vt.Name == "No Title")?.Id;
+
                 // Step 8: place the real viewports at their computed positions.
-                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues);
+                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues, noTitleViewportTypeId);
 
                 // Step 9: for every successfully placed view, copy its own title (the
                 // Mark-based view Name Win_CreateElevations assigned, e.g. "W101.1")
@@ -260,30 +271,29 @@ namespace Brand_25
                 }
 
                 // Show summary
-                string summary = $"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).";
-                if (issues.Count > 0)
-                {
-                    summary += $"\n\n{issues.Count} issue(s) were encountered — see the log for details.";
-                }
-                new Warning("Success", summary, credit).ShowDialog();
+                bool hasIssues = issues.Count > 0;
+
                 log.AppendLine();
-                log.AppendLine(summary);
-                if (issues.Count > 0)
+                log.AppendLine($"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).");
+                if (hasIssues)
                 {
                     log.AppendLine();
                     log.AppendLine($"=== {issues.Count} Issue(s) ===");
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "WinPlaceElevOnSheetsLog.txt");
-                try
+                string logFilePath = Path.Combine(Path.GetTempPath(), "WinPlaceElevOnSheetsLog.txt");
+                string logWriteError = null;
+                try { File.WriteAllText(logFilePath, log.ToString()); }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                string summary = $"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).";
+                if (hasIssues)
                 {
-                    File.WriteAllText(logFilePath, log.ToString());
+                    summary += $"\n\n{issues.Count} issues founded - see log";
                 }
-                catch
-                {
-                    // Non-critical — don't fail the whole command over a log file write issue.
-                }
+                new Warning("Success", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logFilePath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

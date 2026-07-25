@@ -122,7 +122,8 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevTypes, credit);
+                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevTypes, credit,
+                    preSelectedTypeName: "190 Window Elevation");
                 if (elevTypeWindow.ShowDialog() != true || elevTypeWindow.SelectedElevType == null)
                 {
                     return Result.Cancelled;
@@ -489,19 +490,21 @@ namespace Brand_25
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                string logPath = Path.Combine(documentsFolder, $"Win_CreateElevations_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                string logPath = Path.Combine(Path.GetTempPath(), $"Win_CreateElevations_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                string logWriteError = null;
                 try { File.WriteAllText(logPath, log.ToString()); }
-                catch { /* best-effort — summary dialog still shows without it */ }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                bool hasIssues = issues.Count > 0;
 
                 string summary = $"Windows matched: {curtainWalls.Count}\nDoors matched: {alDoors.Count}\n" +
                     $"Elevations created: {created} of {allTargets.Count}";
-                if (issues.Count > 0)
+                if (hasIssues)
                 {
-                    summary += $"\n\nIssues: {issues.Count} (see log for details)";
+                    summary += $"\n\n{issues.Count} issues founded - see log";
                 }
-                //summary += "\n\nDiagnostic log saved to your Documents folder.";
-                new Warning("Create Window Elevations", summary, credit).ShowDialog();
+                new Warning("Create Window Elevations", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logPath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

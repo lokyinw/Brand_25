@@ -166,19 +166,21 @@ namespace Brand_25
                 logWriteError = ex.Message;
             }
 
-            bool hasIssues = skipped.Count > 0 || ambiguousCount > 0/* || baMarkMissingCount > 0*/;
+            int issueCount = skipped.Count + ambiguousCount;
+            bool hasIssues = issueCount > 0;
             bool hasNonLineElements = NonLineElements.Count > 0;
+            bool showLogButton = logWriteError == null && (hasIssues || hasNonLineElements);
 
             string summaryMessage =
                 $"Rooms found in selected phase: {roomsInPhase.Count}\n" +
                 $"Windows processed: {windowTargets.Count}\n" +
                 $"Doors processed: {doorTargets.Count}\n" +
-                (hasNonLineElements ? $"{NonLineElements.Count} non-straight element(s) found.\n" : "") +
-                (hasIssues ? "ISSUES founded - see log\n" : "") +
+                (hasNonLineElements ? $"{NonLineElements.Count} non-straight element(s) found - see log\n" : "") +
+                (hasIssues ? $"{issueCount} issues founded - see log\n" : "") +
                 (logWriteError != null ? $"Log FAILED to write: {logWriteError}" : "");
 
-            new WarningLarge("Assign Window Mark", summaryMessage, credit,
-                revealPath: logWriteError == null ? logPath : null).ShowDialog();
+            new Warning("Assign Window Mark", summaryMessage, credit,
+                revealPath: showLogButton ? logPath : null).ShowDialog();
 
             return Result.Succeeded;
         }

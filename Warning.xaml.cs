@@ -26,7 +26,7 @@ namespace Brand_25
         {
             InitializeComponent();
             MessageText.FontSize = messageFontSize;
-            SetMessage(message, revealPath);
+            SetMessage(message);
             TitleText.Text = title;
             FooterText.Text = footerText;  // Set footer text dynamically
             _revealPath = revealPath;
@@ -45,24 +45,13 @@ namespace Brand_25
             //TitleText.FontFamily = LoadFontFromFile(fontPath);
         }
 
-        // Builds MessageText via Inlines (rather than a plain Text assignment) so the
-        // reveal path, when supplied, can be appended underneath the main message in a
-        // much smaller, muted font - without needing any changes to the XAML.
-        private void SetMessage(string message, string revealPath)
+        // Builds MessageText via Inlines (rather than a plain Text assignment) for
+        // consistency with WarningLarge — the reveal path itself is never shown in
+        // the dialog body; the "Log Folder" button is the only way to reach it.
+        private void SetMessage(string message)
         {
             MessageText.Inlines.Clear();
             MessageText.Inlines.Add(new Run(message));
-
-            if (!string.IsNullOrEmpty(revealPath))
-            {
-                MessageText.Inlines.Add(new LineBreak());
-                MessageText.Inlines.Add(new LineBreak());
-                MessageText.Inlines.Add(new Run(revealPath)
-                {
-                    FontSize = 11,
-                    Foreground = Brushes.DimGray
-                });
-            }
         }
         private BitmapImage LoadEmbeddedImage(string imageName)
         {

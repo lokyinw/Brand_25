@@ -40,7 +40,8 @@ namespace Brand_25
                 }
 
                 // Step 2: Show elevation type selection window
-                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevViewTypes, credit);
+                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevViewTypes, credit,
+                    preSelectedTypeName: "160 Internal Elevation");
                 if (elevTypeWindow.ShowDialog() != true || elevTypeWindow.SelectedElevType == null)
                 {
                     return Result.Cancelled;
@@ -219,33 +220,36 @@ namespace Brand_25
                     transGroup.Assimilate();
                 }
 
-                // Show success message, plus a count of any issues instead of
-                // having popped up a blocking dialog for each one mid-loop.
-                string summary = $"{totalElevationsCreated} internal elevations created.";
-                if (issues.Count > 0)
-                {
-                    summary += $"\n\n{issues.Count} issue(s) were encountered — see the log for details.";
-                }
-                new Warning("Success", summary, credit).ShowDialog();
+                // Step 7: single summary dialog covering success, issues, and log-write
+                // status — replaces the old pattern of a Warning followed by a second,
+                // separate TaskDialog.Show that printed the raw log path directly.
+                bool hasIssues = issues.Count > 0;
+
                 log.AppendLine($"{totalElevationsCreated} internal elevations created.");
-                if (issues.Count > 0)
+                if (hasIssues)
                 {
                     log.AppendLine();
                     log.AppendLine($"=== {issues.Count} Issue(s) ===");
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                // Save the log to a text file
-                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RoomElevationLog.txt");
-                try
+                string logFilePath = Path.Combine(Path.GetTempPath(), "RoomElevationLog.txt");
+                string logWriteError = null;
+                try { File.WriteAllText(logFilePath, log.ToString()); }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                string summary = $"{totalElevationsCreated} internal elevations created.";
+                if (hasIssues)
                 {
-                    File.WriteAllText(logFilePath, log.ToString());
-                    TaskDialog.Show("Success", $"Log saved to: {logFilePath}");
+                    summary += $"\n\n{issues.Count} issues founded - see log";
                 }
-                catch (Exception ex)
+                if (logWriteError != null)
                 {
-                    TaskDialog.Show("Error", $"Failed to save log file: {ex.Message}");
+                    summary += $"\n\nLog FAILED to write: {logWriteError}";
                 }
+
+                new Warning("Success", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logFilePath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

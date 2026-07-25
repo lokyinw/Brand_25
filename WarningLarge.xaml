@@ -89,7 +89,7 @@
 
         <!-- Only shown when the caller passes a revealPath into the constructor —
              other WarningLarge usages are unaffected and never see this button. -->
-        <Button x:Name="OpenFolderButton" Content="Open Log Folder" Width="140" Height="30"
+        <Button x:Name="OpenFolderButton" Content="Log Folder" Width="140" Height="30"
                 Click="OpenFolder_Click"
                 Style="{StaticResource CustomButtonFontStyle}"
                 HorizontalAlignment="Left" Grid.Row="2" VerticalAlignment="Center"

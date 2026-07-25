@@ -37,14 +37,12 @@ namespace Brand_25
             FooterText.Text = footerText;
 
             ViewTypeCombo.ItemsSource = elevationTypes;
-            if (elevationTypes.Count > 0)
-            {
-                ViewTypeCombo.SelectedIndex = 0;
-            }
+            ViewFamilyType preSelectedType = elevationTypes.FirstOrDefault(t => t.Name == "160 Internal Elevation");
+            ViewTypeCombo.SelectedItem = preSelectedType ?? elevationTypes.FirstOrDefault();
 
-            // Revit line weights run 1-16; ComboBox default (index 0) is 1.
+            // Revit line weights run 1-16; default to 10 rather than 1.
             LineWeightCombo.ItemsSource = Enumerable.Range(1, 16).ToList();
-            LineWeightCombo.SelectedIndex = 0;
+            LineWeightCombo.SelectedItem = 10;
         }
 
         private BitmapImage LoadEmbeddedImage(string imageName)

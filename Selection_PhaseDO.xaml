@@ -145,7 +145,7 @@
 
             <ScrollViewer x:Name="NumericFieldsContainer" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                 <StackPanel Margin="5 0 5 0">
-                    <TextBlock Text="Crop Box Settings (mm):" Style="{StaticResource ComboBoxLabelStyle}" Margin="0 10 0 10"/>
+                    <TextBlock Text="Crop Box Settings:" Style="{StaticResource CustomFontStyle}" FontSize="20" Margin="0 10 0 10"/>
 
                     <StackPanel Orientation="Horizontal" Margin="0 0 0 2">
                         <TextBlock Text="Left/Right Margin:" Style="{StaticResource NumericLabelStyle}"/>

@@ -10,22 +10,34 @@ namespace Brand_25
     // Tags every curtain wall (BA_TypeFilter = "CW") and every door visible in the
     // active view. Tag types are picked once via Selection_TagTypes.xaml — the same
     // dialog (and same default-type lookup) already used by Win_CreateElevations.cs —
-    // so all Windows-panel commands agree on how a "window tag" / "door tag" is chosen.
+    // so every Windows-panel command agrees on how a "window tag" / "door tag" is chosen.
     [Transaction(TransactionMode.Manual)]
     public class Win_TagAll : IExternalCommand
     {
+        // mm -> feet (Revit's internal length unit)
+        private const double MmToFt = 1.0 / 304.8;
+
+        // Each tag is nudged this far (paper space) off the element's own centerpoint,
+        // perpendicular to the wall/door, so it doesn't sit directly on top of the
+        // geometry it's tagging.
+        private const double TagOffsetMm = 4.0;
+
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
             View activeView = doc.ActiveView;
-            string credit = "Last Modified by Lok on 2026-07-23. Beta 0.10";
+            string credit = "Last Modified by Lok on 2026-07-23. Beta 0.11";
 
             if (activeView is View3D)
             {
                 new Warning("Oops...", "Tags can't be placed in a 3D view.\nSwitch to a plan, elevation, or section view and try again.", credit).ShowDialog();
                 return Result.Cancelled;
             }
+
+            // Paper mm -> model feet, scaled by this view's own print scale — matches
+            // the convention used throughout Win_CreateElevations.cs / Win_DimensionElevations.cs.
+            double tagOffsetFt = TagOffsetMm * activeView.Scale * MmToFt;
 
             try
             {
@@ -123,7 +135,7 @@ namespace Brand_25
 
                     foreach (Wall wall in wallsToTag)
                     {
-                        XYZ tagPoint = GetWallTagPoint(wall);
+                        XYZ tagPoint = GetWallTagPoint(wall, tagOffsetFt);
                         if (tagPoint == null)
                         {
                             issues.Add($"Curtain Wall (Id {wall.Id}): no usable location; skipped.");
@@ -144,10 +156,10 @@ namespace Brand_25
 
                     foreach (FamilyInstance door in doorsToTag)
                     {
-                        XYZ tagPoint = (door.Location as LocationPoint)?.Point;
+                        XYZ tagPoint = GetDoorTagPoint(door, activeView, tagOffsetFt);
                         if (tagPoint == null)
                         {
-                            issues.Add($"Door (Id {door.Id}): no usable location point; skipped.");
+                            issues.Add($"Door (Id {door.Id}): no usable location or bounding box; skipped.");
                             continue;
                         }
 
@@ -171,7 +183,8 @@ namespace Brand_25
                 {
                     summary += $"\n\n{issues.Count} issue(s) were encountered:\n" + string.Join("\n", issues);
                 }
-                new WarningLarge("Tag Complete", summary, credit).ShowDialog();
+                //new WarningLarge("Tag Complete", summary, credit).ShowDialog();
+                new Warning("Tag Complete", summary, credit).ShowDialog();
 
                 return Result.Succeeded;
             }
@@ -206,16 +219,71 @@ namespace Brand_25
             return typeFilterParam != null && typeFilterParam.AsString() == "CW";
         }
 
-        // Tag anchor point: the curtain wall's own centerline midpoint. Good enough
-        // for a first pass — Revit will still let the user drag the tag afterward.
-        private static XYZ GetWallTagPoint(Wall wall)
+        // Tag anchor: the curtain wall's own centerline midpoint, nudged perpendicular
+        // to the wall (its plan-view normal) by tagOffsetFt so the tag doesn't sit
+        // directly on top of the wall it's tagging.
+        private static XYZ GetWallTagPoint(Wall wall, double offsetFt)
         {
             LocationCurve loc = wall.Location as LocationCurve;
             if (loc == null) return null;
 
             XYZ start = loc.Curve.GetEndPoint(0);
             XYZ end = loc.Curve.GetEndPoint(1);
-            return (start + end) * 0.5;
+            XYZ midpoint = (start + end) * 0.5;
+
+            XYZ dir = (end - start).Normalize();
+            XYZ normal = new XYZ(-dir.Y, dir.X, 0).Normalize();
+
+            return midpoint + normal * offsetFt;
+        }
+
+        // Tag anchor for a door: always the geometric center of its bounding box
+        // (view-specific first, falling back to the unbounded/document-wide box),
+        // rather than LocationPoint — this keeps regular wall-hosted doors and
+        // curtain-wall-hosted door panels (which typically report Location == null)
+        // on the exact same code path, so both are anchored consistently.
+        private static XYZ GetDoorTagPoint(FamilyInstance door, View view, double offsetFt)
+        {
+            BoundingBoxXYZ bbox = door.get_BoundingBox(view) ?? door.get_BoundingBox(null);
+            if (bbox == null) return null;
+
+            XYZ basePoint = (bbox.Min + bbox.Max) * 0.5;
+
+            XYZ normal = GetDoorPerpendicularDirection(door);
+            return basePoint + normal * offsetFt;
+        }
+
+        // Direction perpendicular to the wall/panel plane, used to nudge a door's tag
+        // off its centerpoint. FacingOrientation is defined for any placed family
+        // instance regardless of hosting mechanism (normal wall-hosted door, or a
+        // door used as a curtain-wall panel), and points perpendicular to the plane
+        // the door swings out of — exactly the direction we want. Falls back to the
+        // host wall's own centerline normal in the rare case FacingOrientation isn't
+        // available, and finally to a fixed default so a tag is never skipped just
+        // because the perpendicular direction couldn't be determined.
+        private static XYZ GetDoorPerpendicularDirection(FamilyInstance door)
+        {
+            try
+            {
+                XYZ facing = door.FacingOrientation;
+                if (facing != null && !facing.IsZeroLength())
+                {
+                    XYZ flat = new XYZ(facing.X, facing.Y, 0);
+                    if (!flat.IsZeroLength()) return flat.Normalize();
+                }
+            }
+            catch
+            {
+                // fall through to the host-wall-based fallback below
+            }
+
+            if (door.Host is Wall hostWall && hostWall.Location is LocationCurve hostLoc)
+            {
+                XYZ dir = (hostLoc.Curve.GetEndPoint(1) - hostLoc.Curve.GetEndPoint(0)).Normalize();
+                return new XYZ(-dir.Y, dir.X, 0).Normalize();
+            }
+
+            return XYZ.BasisX; // last-resort default
         }
     }
 }

@@ -250,15 +250,18 @@ namespace Brand_25
             // ── Step 9: Dialog — completion report (kept to the essentials;
             // everything else is in the log) ──────────────────────────────────
 
+            int issueCount = skippedTypeNames.Distinct().Count();
+            bool hasIssues = issueCount > 0;
+
             string completionMessage =
                 $"\u25CF  {typesDeleted} Text Note Type(s) deleted.\n" +
-                $"\u25CF  {skippedTypeNames.Distinct().Count()} Text Note Type(s) left untouched (There are instances inside some groups).\n" +
-                $"\u25CF  {reassigned} instance(s) reassigned in total.\n\n" +
-                (logFilePath != null
-                    ? $"Full details logged to:\n   {logFilePath}"
-                    : "The log file could not be written.");
+                $"\u25CF  {issueCount} Text Note Type(s) left untouched (There are instances inside some groups).\n" +
+                $"\u25CF  {reassigned} instance(s) reassigned in total.\n" +
+                (hasIssues ? $"\n{issueCount} issues founded - see log" : "") +
+                (logFilePath == null ? "\n\nThe log file could not be written." : "");
 
-            new WarningLarge("Consolidation Complete", completionMessage, credit, revealPath: logFilePath).ShowDialog();
+            new WarningLarge("Consolidation Complete", completionMessage, credit,
+                revealPath: (logFilePath != null && hasIssues) ? logFilePath : null).ShowDialog();
 
             return Result.Succeeded;
         }
@@ -270,9 +273,9 @@ namespace Brand_25
         {
             try
             {
-                string documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string tempFolder = Path.GetTempPath();
                 string fileName = $"TextNoteType_Consolidation_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt";
-                string logFilePath = Path.Combine(documentsFolder, fileName);
+                string logFilePath = Path.Combine(tempFolder, fileName);
 
                 var logLines = new List<string>
                 {

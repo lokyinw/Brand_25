@@ -18,7 +18,8 @@ namespace Brand_25
 
         public ViewFamilyType SelectedElevType { get; private set; }
 
-        public Selection_ElevType(List<ViewFamilyType> elevTypes, string credit = "Selection_ElevType Default")
+        public Selection_ElevType(List<ViewFamilyType> elevTypes, string credit = "Selection_ElevType Default",
+            string preSelectedTypeName = null)
         {
             _credit = credit;
 
@@ -27,9 +28,18 @@ namespace Brand_25
             FooterText.Text = credit;  // Set footer text dynamically
 
             // Load elevation types into the ListBox
-            IOrderedEnumerable<VM_ElevType> elevTypeViewModels = elevTypes.Select(et => new VM_ElevType(et)).ToList()
-                .OrderBy(v => v.Name); // Sorting alphabetically;
+            List<VM_ElevType> elevTypeViewModels = elevTypes.Select(et => new VM_ElevType(et))
+                .OrderBy(v => v.Name).ToList(); // Sorting alphabetically;
             ElevTypesListBox.ItemsSource = elevTypeViewModels;
+
+            // Pre-select a known type by name (e.g. the project's standard window or
+            // internal elevation type) if it exists in this project; otherwise leave
+            // unselected, same as before this parameter existed.
+            if (!string.IsNullOrEmpty(preSelectedTypeName))
+            {
+                VM_ElevType match = elevTypeViewModels.FirstOrDefault(v => v.Name == preSelectedTypeName);
+                if (match != null) ElevTypesListBox.SelectedItem = match;
+            }
 
             // Load images from embedded resources
             minimizeImage.Source = LoadEmbeddedImage("minimize_32.png");

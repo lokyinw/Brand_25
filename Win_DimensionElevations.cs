@@ -45,7 +45,8 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevViewTypes, credit);
+                Selection_ElevType elevTypeWindow = new Selection_ElevType(elevViewTypes, credit,
+                    preSelectedTypeName: "190 Window Elevation");
                 if (elevTypeWindow.ShowDialog() != true || elevTypeWindow.SelectedElevType == null)
                 {
                     return Result.Cancelled;
@@ -186,22 +187,28 @@ namespace Brand_25
                     trans.Commit();
                 }
 
-                string summary = $"{wallElevCount} curtain wall elevation(s) and {doorElevCount} door elevation(s) dimensioned.";
-                if (skippedCount > 0) summary += $"\n{skippedCount} elevation(s) skipped — see log for details.";
-
-                new Warning(issues.Count > 0 ? "Completed with issues" : "Success", summary, credit).ShowDialog();
+                bool hasIssues = issues.Count > 0;
 
                 log.AppendLine();
-                log.AppendLine(summary);
-                if (issues.Count > 0)
+                log.AppendLine($"{wallElevCount} curtain wall elevation(s) and {doorElevCount} door elevation(s) dimensioned.");
+                if (hasIssues)
                 {
                     log.AppendLine();
                     log.AppendLine($"=== {issues.Count} Issue(s) ===");
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "WindowDimensionLog.txt");
-                try { File.WriteAllText(logFilePath, log.ToString()); } catch { /* logging is best-effort */ }
+                string logFilePath = Path.Combine(Path.GetTempPath(), "WindowDimensionLog.txt");
+                string logWriteError = null;
+                try { File.WriteAllText(logFilePath, log.ToString()); }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                string summary = $"{wallElevCount} curtain wall elevation(s) and {doorElevCount} door elevation(s) dimensioned.";
+                if (skippedCount > 0) summary += $"\n{skippedCount} elevation(s) skipped.";
+                if (hasIssues) summary += $"\n\n{issues.Count} issues founded - see log";
+
+                new Warning(hasIssues ? "Completed with issues" : "Success", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logFilePath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

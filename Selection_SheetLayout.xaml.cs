@@ -61,7 +61,8 @@ namespace Brand_25
         // default-selection bias. Defaults match the original, Elev_PlaceOnSheets-only
         // behavior exactly, so that command needed no changes at its call site.
         public Selection_SheetLayout(List<ViewFamilyType> elevationTypes, List<Phase> phases, string credit = "Selection_SheetLayout Default",
-            string dialogTitle = "Place Internal Elevations on Sheet", string preferredTypeNameContains = "Internal Elevation")
+            string dialogTitle = "Place Internal Elevations on Sheet", string preferredTypeNameContains = "Internal Elevation",
+            string defaultSheetNumber = "A160")
         {
             InitializeComponent();
             TitleText.Text = dialogTitle;
@@ -74,7 +75,7 @@ namespace Brand_25
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
 
             // Pre-fill defaults measured from the firm's standard A1 title block.
-            SheetNumberBox.Text = "A160";
+            SheetNumberBox.Text = defaultSheetNumber;
 
             PaperWidthBox.Text = "841";
             PaperHeightBox.Text = "594";

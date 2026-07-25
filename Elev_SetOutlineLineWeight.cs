@@ -125,33 +125,30 @@ namespace Brand_25
                 }
 
                 // Step 5: show summary.
-                string summary = isRestore
-                    ? $"Overrides restored to default on {viewsEdited} of {matchingViews.Count} view(s)."
-                    : $"Line weight {lineWeight} applied to {viewsEdited} of {matchingViews.Count} view(s).";
-                if (viewsWithNoElements.Count > 0)
-                {
-                    summary += $"\n\n{viewsWithNoElements.Count} view(s) had nothing to override — see the log for details.";
-                }
-                new Warning("Success", summary, credit).ShowDialog();
+                bool hasIssues = issues.Count > 0;
 
                 log.AppendLine();
-                log.AppendLine(summary);
-                if (issues.Count > 0)
+                if (hasIssues)
                 {
                     log.AppendLine();
                     log.AppendLine($"=== {issues.Count} Issue(s) ===");
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ElevSetOutlineLineWeightLog.txt");
-                try
+                string logFilePath = Path.Combine(Path.GetTempPath(), "ElevSetOutlineLineWeightLog.txt");
+                string logWriteError = null;
+                try { File.WriteAllText(logFilePath, log.ToString()); }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                string summary = isRestore
+                    ? $"Overrides restored to default on {viewsEdited} of {matchingViews.Count} view(s)."
+                    : $"Line weight {lineWeight} applied to {viewsEdited} of {matchingViews.Count} view(s).";
+                if (hasIssues)
                 {
-                    File.WriteAllText(logFilePath, log.ToString());
+                    summary += $"\n\n{issues.Count} issues founded - see log";
                 }
-                catch
-                {
-                    // Non-critical — don't fail the whole command over a log file write issue.
-                }
+                new Warning("Success", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logFilePath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

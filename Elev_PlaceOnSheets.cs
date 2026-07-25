@@ -259,30 +259,29 @@ namespace Brand_25
                 }
 
                 // Show summary
-                string summary = $"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).";
-                if (issues.Count > 0)
-                {
-                    summary += $"\n\n{issues.Count} issue(s) were encountered — see the log for details.";
-                }
-                new Warning("Success", summary, credit).ShowDialog();
+                bool hasIssues = issues.Count > 0;
+
                 log.AppendLine();
-                log.AppendLine(summary);
-                if (issues.Count > 0)
+                log.AppendLine($"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).");
+                if (hasIssues)
                 {
                     log.AppendLine();
                     log.AppendLine($"=== {issues.Count} Issue(s) ===");
                     foreach (string issue in issues) log.AppendLine(issue);
                 }
 
-                string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ElevPlaceOnSheetsLog.txt");
-                try
+                string logFilePath = Path.Combine(Path.GetTempPath(), "ElevPlaceOnSheetsLog.txt");
+                string logWriteError = null;
+                try { File.WriteAllText(logFilePath, log.ToString()); }
+                catch (Exception ex) { logWriteError = ex.Message; }
+
+                string summary = $"{placedCount} of {elevationViews.Count} elevation(s) placed across {sheetList.Count} sheet(s).";
+                if (hasIssues)
                 {
-                    File.WriteAllText(logFilePath, log.ToString());
+                    summary += $"\n\n{issues.Count} issues founded - see log";
                 }
-                catch
-                {
-                    // Non-critical — don't fail the whole command over a log file write issue.
-                }
+                new Warning("Success", summary, credit,
+                    revealPath: (logWriteError == null && hasIssues) ? logFilePath : null).ShowDialog();
 
                 return Result.Succeeded;
             }

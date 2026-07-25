@@ -295,8 +295,13 @@ namespace Brand_25
         // Places every view at its computed position (its own transaction), logging
         // both the target and the actual resulting geometry post-placement — matching
         // Elev_PlaceOnSheets' original Step 8 exactly.
+        // viewportTypeId: optional. When supplied and valid, every newly created
+        // Viewport is switched to this type (e.g. a "No Title" viewport family type)
+        // right after creation. Left null (the default), viewports keep whatever type
+        // Viewport.Create picks on its own — existing callers that don't pass this
+        // see no change in behavior.
         public static (int placedCount, List<int> placedIndices) PlaceViewportsOnSheets(Document doc, List<View> elevationViews,
-            LayoutResult layout, List<ViewSheet> sheetList, StringBuilder log, List<string> issues)
+            LayoutResult layout, List<ViewSheet> sheetList, StringBuilder log, List<string> issues, ElementId viewportTypeId = null)
         {
             int placedCount = 0;
             List<int> placedIndices = new List<int>();
@@ -331,6 +336,18 @@ namespace Brand_25
                         log.AppendLine($"Error: {issue}");
                         issues.Add(issue);
                         continue;
+                    }
+
+                    if (viewportTypeId != null && viewportTypeId != ElementId.InvalidElementId)
+                    {
+                        try
+                        {
+                            vp.ChangeTypeId(viewportTypeId);
+                        }
+                        catch (Exception ex)
+                        {
+                            log.AppendLine($"Warning: View '{elevationViews[i].Name}': failed to switch viewport to the requested type: {ex.Message}");
+                        }
                     }
 
                     vp.SetBoxCenter(new XYZ(layout.PlaceX[i], layout.PlaceY[i], 0));

@@ -18,14 +18,17 @@ namespace Brand_25
     {
         private readonly string _revealPath;
 
-        // revealPath: optional file or folder to reveal via the "Open Log Folder"
+        // messageFontSize: overrides the XAML design-time default (20) so callers can
+        // dial the body text up or down per-dialog without touching the XAML.
+        // revealPath: optional file or folder to reveal via the "Log Folder"
         // button. Leave it null (the default) and the button stays hidden — existing
         // calls elsewhere in the codebase are unaffected.
         public WarningLarge(string title, string message, string footerText = "Default Warning",
-                             string revealPath = null)
+                             double messageFontSize = 20, string revealPath = null)
         {
             InitializeComponent();
-            SetMessage(message, revealPath);
+            MessageText.FontSize = messageFontSize;
+            SetMessage(message);
             TitleText.Text = title;
             FooterText.Text = footerText;
             _revealPath = revealPath;
@@ -40,23 +43,14 @@ namespace Brand_25
                 OpenFolderButton.Visibility = Visibility.Visible;
         }
 
-        // Builds MessageText via Inlines (rather than a plain Text assignment) so the
-        // reveal path, when supplied, can be appended underneath the main message in a
-        // much smaller, muted font - without needing any changes to the XAML.
-        private void SetMessage(string message, string revealPath)
+        // Builds MessageText via Inlines (rather than a plain Text assignment) for
+        // consistency with the constructor's font-size override — the reveal path
+        // itself is never shown in the dialog body; the "Log Folder" button is the
+        // only way to reach it.
+        private void SetMessage(string message)
         {
             MessageText.Inlines.Clear();
             MessageText.Inlines.Add(new Run(message));
-
-            if (!string.IsNullOrEmpty(revealPath))
-            {
-                MessageText.Inlines.Add(new LineBreak());
-                MessageText.Inlines.Add(new Run(revealPath)
-                {
-                    FontSize = 12,
-                    Foreground = Brushes.DimGray
-                });
-            }
         }
 
         private BitmapImage LoadEmbeddedImage(string imageName)
