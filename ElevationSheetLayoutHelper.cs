@@ -295,16 +295,29 @@ namespace Brand_25
         // Places every view at its computed position (its own transaction), logging
         // both the target and the actual resulting geometry post-placement — matching
         // Elev_PlaceOnSheets' original Step 8 exactly.
-        // viewportTypeId: optional. When supplied and valid, every newly created
-        // Viewport is switched to this type (e.g. a "No Title" viewport family type)
-        // right after creation. Left null (the default), viewports keep whatever type
-        // Viewport.Create picks on its own — existing callers that don't pass this
-        // see no change in behavior.
+        // viewportTypeName: optional. When supplied, every newly created Viewport is
+        // switched to the type with this exact Name (e.g. "No Title"), if that type
+        // exists among the valid types for these viewports. Left null (the default),
+        // viewports keep whatever type Viewport.Create picks on its own — existing
+        // callers that don't pass this see no change in behavior.
+        //
+        // Viewport types are NOT reliably found via a plain FilteredElementCollector
+        // category query (OST_Viewports) — that returns zero results even when the
+        // type genuinely exists in the project. The supported way to enumerate them
+        // is Viewport.GetValidTypes(), which only works on an actual Viewport
+        // instance — hence the "place first, then resolve the type" order here,
+        // matching the algorithm requested: place on sheet -> get the viewport ->
+        // switch its type. The lookup only needs to run once (on the first
+        // successfully placed viewport); the resolved ElementId is reused for every
+        // viewport placed afterward.
         public static (int placedCount, List<int> placedIndices) PlaceViewportsOnSheets(Document doc, List<View> elevationViews,
-            LayoutResult layout, List<ViewSheet> sheetList, StringBuilder log, List<string> issues, ElementId viewportTypeId = null)
+            LayoutResult layout, List<ViewSheet> sheetList, StringBuilder log, List<string> issues, string viewportTypeName = null)
         {
             int placedCount = 0;
             List<int> placedIndices = new List<int>();
+
+            ElementId resolvedViewportTypeId = null;
+            bool viewportTypeLookupDone = false;
 
             log.AppendLine();
             log.AppendLine("=== Placement Data (tab-separated; paste into Excel) ===");
@@ -338,15 +351,46 @@ namespace Brand_25
                         continue;
                     }
 
-                    if (viewportTypeId != null && viewportTypeId != ElementId.InvalidElementId)
+                    if (!string.IsNullOrEmpty(viewportTypeName))
                     {
-                        try
+                        // Resolve once, off the first real viewport we have in hand —
+                        // GetValidTypes() needs an actual instance to call on.
+                        if (!viewportTypeLookupDone)
                         {
-                            vp.ChangeTypeId(viewportTypeId);
+                            viewportTypeLookupDone = true;
+
+                            ICollection<ElementId> validTypeIds = vp.GetValidTypes();
+                            log.AppendLine();
+                            log.AppendLine("=== Viewport Type Lookup (via Viewport.GetValidTypes on first placed viewport) ===");
+                            log.AppendLine($"Valid viewport type(s) for this viewport: {validTypeIds.Count}");
+                            foreach (ElementId typeId in validTypeIds)
+                            {
+                                Element t = doc.GetElement(typeId);
+                                log.AppendLine($"  '{t?.Name}' (Id {typeId.Value})");
+                            }
+
+                            resolvedViewportTypeId = validTypeIds
+                                .Select(typeId => doc.GetElement(typeId))
+                                .FirstOrDefault(t => t != null && t.Name == viewportTypeName)?.Id;
+
+                            log.AppendLine(resolvedViewportTypeId != null
+                                ? $"Match: using '{viewportTypeName}' (Id {resolvedViewportTypeId.Value}) for every viewport placed below."
+                                : $"No exact match for '{viewportTypeName}' among valid types — viewports below will keep their default type.");
                         }
-                        catch (Exception ex)
+
+                        if (resolvedViewportTypeId != null)
                         {
-                            log.AppendLine($"Warning: View '{elevationViews[i].Name}': failed to switch viewport to the requested type: {ex.Message}");
+                            string typeBefore = doc.GetElement(vp.GetTypeId())?.Name ?? "Unknown";
+                            try
+                            {
+                                vp.ChangeTypeId(resolvedViewportTypeId);
+                                string typeAfter = doc.GetElement(vp.GetTypeId())?.Name ?? "Unknown";
+                                log.AppendLine($"  View '{elevationViews[i].Name}': viewport type '{typeBefore}' -> '{typeAfter}'.");
+                            }
+                            catch (Exception ex)
+                            {
+                                log.AppendLine($"Warning: View '{elevationViews[i].Name}': failed to switch viewport from '{typeBefore}' to '{viewportTypeName}': {ex.Message}");
+                            }
                         }
                     }
 

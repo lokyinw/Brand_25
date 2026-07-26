@@ -233,18 +233,14 @@ namespace Brand_25
                 // Step 7: create any additional sheets the layout needs.
                 List<ViewSheet> sheetList = ElevationSheetLayoutHelper.CreateAdditionalSheets(doc, startingSheet, layout.MaxSheetIndex, log, issues);
 
-                // Step 7.5: if a "No Title" viewport type exists in this project, use it
-                // for every viewport placed by this command — window/door elevation
-                // sheets don't want the usual title/label block under each viewport.
-                // Left null if no such type exists, so PlaceViewportsOnSheets falls back
-                // to whatever type Viewport.Create picks by default (unchanged behavior).
-                ElementId noTitleViewportTypeId = new FilteredElementCollector(doc)
-                    .OfCategory(BuiltInCategory.OST_Viewports)
-                    .WhereElementIsElementType()
-                    .FirstOrDefault(vt => vt.Name == "No Title")?.Id;
-
                 // Step 8: place the real viewports at their computed positions.
-                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues, noTitleViewportTypeId);
+                // "No Title" is looked up inside PlaceViewportsOnSheets, once the first
+                // viewport actually exists — Viewport types can't be reliably found via
+                // a document-wide category query beforehand (that returns zero results
+                // even when the type exists), so it's resolved from a real instance via
+                // Viewport.GetValidTypes() instead. If no exact-name match exists in
+                // this project, every viewport just keeps its default type.
+                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues, viewportTypeName: "No Title");
 
                 // Step 9: for every successfully placed view, copy its own title (the
                 // Mark-based view Name Win_CreateElevations assigned, e.g. "W101.1")

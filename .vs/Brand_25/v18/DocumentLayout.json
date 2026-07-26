@@ -3,8 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\warning.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:warning.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\win_placeelevonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:win_placeelevonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -23,13 +23,14 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Warning.xaml",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml",
-              "RelativeDocumentMoniker": "Warning.xaml",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml",
-              "RelativeToolTip": "Warning.xaml",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-07-25T01:31:23.403Z",
+              "Title": "Win_PlaceElevOnSheets.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Win_PlaceElevOnSheets.cs",
+              "RelativeDocumentMoniker": "Win_PlaceElevOnSheets.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Win_PlaceElevOnSheets.cs",
+              "RelativeToolTip": "Win_PlaceElevOnSheets.cs",
+              "ViewState": "AgIAAN8AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-26T22:30:54.09Z",
               "EditorCaption": ""
             },
             {
