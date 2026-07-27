@@ -32,6 +32,19 @@ namespace Brand_25
         private const double LeftMarginCompensationMm = 1.75;
         // ---------------------------------------------------------------------------
 
+        // --- Label bubble alignment / line length -----------------------------
+        // LabelRightShiftMm aligns the label bubble's left edge with the viewport's
+        // own left edge. The line-length breakdown (head + spacer + title width +
+        // overhang) mirrors how the title block's label line is actually built up
+        // visually: a fixed head segment, a small spacer, then a run scaled to the
+        // title text itself, plus a small overhang past the last character.
+        private const double LabelRightShiftMm = 37.25;
+        private const double LabelHeadMm = 12.5;
+        private const double LabelSpacerMm = 2.5;
+        private const double LabelPerCharMm = 3.0;
+        private const double LabelOverhangMm = 5.0;
+        // ---------------------------------------------------------------------------
+
         // Extra paper-space extension given to the bubble end of a row-ending view,
         // on top of LevelExtensionMm, so there's room to read the level bubble/text.
         private const double RowEndBubbleExtraMm = 40.0;
@@ -310,11 +323,18 @@ namespace Brand_25
         // switch its type. The lookup only needs to run once (on the first
         // successfully placed viewport); the resolved ElementId is reused for every
         // viewport placed afterward.
-        public static (int placedCount, List<int> placedIndices) PlaceViewportsOnSheets(Document doc, List<View> elevationViews,
+        //
+        // placedViewports is a parallel list (same length/indexing as elevationViews):
+        // index i holds the Viewport actually created for elevationViews[i], or null
+        // if that view was skipped/failed to place. Returned so callers (e.g.
+        // Elev_PlaceOnSheets) can do further per-viewport adjustments — like label
+        // offset/line length — without a second lookup pass.
+        public static (int placedCount, List<int> placedIndices, List<Viewport> placedViewports) PlaceViewportsOnSheets(Document doc, List<View> elevationViews,
             LayoutResult layout, List<ViewSheet> sheetList, StringBuilder log, List<string> issues, string viewportTypeName = null)
         {
             int placedCount = 0;
             List<int> placedIndices = new List<int>();
+            List<Viewport> placedViewports = new List<Viewport>(new Viewport[elevationViews.Count]); // null until placed
 
             ElementId resolvedViewportTypeId = null;
             bool viewportTypeLookupDone = false;
@@ -395,6 +415,7 @@ namespace Brand_25
                     }
 
                     vp.SetBoxCenter(new XYZ(layout.PlaceX[i], layout.PlaceY[i], 0));
+                    placedViewports[i] = vp;
                     placedCount++;
                     placedIndices.Add(i);
 
@@ -417,7 +438,30 @@ namespace Brand_25
                 placeTrans.Commit();
             }
 
-            return (placedCount, placedIndices);
+            return (placedCount, placedIndices, placedViewports);
+        }
+
+        // Shifts the label bubble right so its left edge lines up with the viewport's
+        // own left edge, and sets the label line to head+spacer+title-width+overhang —
+        // so the line's visible length tracks the actual title text instead of a fixed
+        // guess. Additive on LabelOffset (not an absolute assignment) so any pre-existing
+        // offset on the viewport isn't clobbered.
+        public static void AdjustViewportLabel(Viewport vp, string title, StringBuilder log, List<string> issues)
+        {
+            try
+            {
+                XYZ currentOffset = vp.LabelOffset;
+                vp.LabelOffset = new XYZ(currentOffset.X + LabelRightShiftMm * MmToFeet, currentOffset.Y, currentOffset.Z);
+
+                double lengthMm = /*LabelHeadMm + */LabelSpacerMm + (title?.Length ?? 0) * LabelPerCharMm + LabelOverhangMm;
+                vp.LabelLineLength = lengthMm * MmToFeet;
+            }
+            catch (Exception ex)
+            {
+                string issue = $"Viewport for view Id {vp.ViewId.Value}: failed to adjust label offset/line length: {ex.Message}";
+                log.AppendLine($"Warning: {issue}");
+                issues.Add(issue);
+            }
         }
 
         // Hides the bubble at both ends of every level visible in the view, and

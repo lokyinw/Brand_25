@@ -55,7 +55,7 @@ namespace Brand_25
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-07-22. Beta 0.10";
+            string credit = "Last Modified by Lok on 2026-07-27. Beta 0.15";
 
             StringBuilder log = new StringBuilder();
             List<string> issues = new List<string>();
@@ -240,7 +240,7 @@ namespace Brand_25
                 // even when the type exists), so it's resolved from a real instance via
                 // Viewport.GetValidTypes() instead. If no exact-name match exists in
                 // this project, every viewport just keeps its default type.
-                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues, viewportTypeName: "No Title");
+                (int placedCount, List<int> placedIndices, _) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues, viewportTypeName: "No Title");
 
                 // Step 9: for every successfully placed view, copy its own title (the
                 // Mark-based view Name Win_CreateElevations assigned, e.g. "W101.1")

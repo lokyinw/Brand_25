@@ -38,7 +38,7 @@ namespace Brand_25
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-07-16. Beta 0.11";
+            string credit = "Last Modified by Lok on 2026-07-27. Beta 0.15";
 
             StringBuilder log = new StringBuilder();
             List<string> issues = new List<string>();
@@ -231,14 +231,16 @@ namespace Brand_25
                 List<ViewSheet> sheetList = ElevationSheetLayoutHelper.CreateAdditionalSheets(doc, startingSheet, layout.MaxSheetIndex, log, issues);
 
                 // Step 8: place the real viewports at their computed positions.
-                (int placedCount, List<int> placedIndices) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues);
+                (int placedCount, List<int> placedIndices, List<Viewport> placedViewports) = ElevationSheetLayoutHelper.PlaceViewportsOnSheets(doc, elevationViews, layout, sheetList, log, issues);
 
                 // Step 9: for every successfully placed view, set "Title on Sheet" from its
                 // room, and clean up level line display — hide bubbles on every level
                 // visible in the view (there can be more than one for an atrium or a room
                 // adjacent to a split level), shorten each line, and, only for the view
                 // that ends its row, retain the bubble on the right so the row still
-                // visually indicates which floor it belongs to.
+                // visually indicates which floor it belongs to. Also aligns the label
+                // bubble with the viewport's left edge and sets its line length to match
+                // the title text (ElevationSheetLayoutHelper.AdjustViewportLabel).
                 using (Transaction titleTrans = new Transaction(doc, "LW_Set View Titles and Level Display"))
                 {
                     titleTrans.Start();
@@ -252,9 +254,16 @@ namespace Brand_25
                         Parameter titleParam = v.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
                         Parameter nameParam = room.get_Parameter(BuiltInParameter.ROOM_NAME);
                         string roomName = nameParam != null && nameParam.HasValue ? nameParam.AsString() : "No Room Name";
-                        titleParam?.Set($"{room.Number} {roomName}");
+                        string title = $"{room.Number} {roomName}";
+                        titleParam?.Set(title);
 
                         ElevationSheetLayoutHelper.UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelExtensionMm, log, issues);
+
+                        Viewport vp = placedViewports[i];
+                        if (vp != null)
+                        {
+                            ElevationSheetLayoutHelper.AdjustViewportLabel(vp, title, log, issues);
+                        }
                     }
 
                     titleTrans.Commit();
