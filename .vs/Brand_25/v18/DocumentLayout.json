@@ -3,8 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\win_placeelevonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:win_placeelevonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:elev_placeonsheets.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:room_createintelev.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -23,19 +27,32 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Win_PlaceElevOnSheets.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Win_PlaceElevOnSheets.cs",
-              "RelativeDocumentMoniker": "Win_PlaceElevOnSheets.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Win_PlaceElevOnSheets.cs",
-              "RelativeToolTip": "Win_PlaceElevOnSheets.cs",
-              "ViewState": "AgIAAN8AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
+              "Title": "Elev_PlaceOnSheets.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
+              "RelativeDocumentMoniker": "Elev_PlaceOnSheets.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Elev_PlaceOnSheets.cs",
+              "RelativeToolTip": "Elev_PlaceOnSheets.cs",
+              "ViewState": "AgIAAOUAAAAAAAAAAAAgwPwAAAArAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-26T22:30:54.09Z",
+              "WhenOpened": "2026-07-27T03:13:20.377Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "Room_CreateIntElev.cs",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
+              "RelativeDocumentMoniker": "Room_CreateIntElev.cs",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Room_CreateIntElev.cs",
+              "RelativeToolTip": "Room_CreateIntElev.cs",
+              "ViewState": "AgIAAGMCAAAAAAAAAAAAAHYCAABNAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-27T03:27:16.07Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "App.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
               "RelativeDocumentMoniker": "App.cs",

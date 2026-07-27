@@ -250,7 +250,9 @@ namespace Brand_25
                         bool isRowEnd = layout.IsRowEnd[i];
 
                         Parameter titleParam = v.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION);
-                        titleParam?.Set($"{room.Number} {room.Name}");
+                        Parameter nameParam = room.get_Parameter(BuiltInParameter.ROOM_NAME);
+                        string roomName = nameParam != null && nameParam.HasValue ? nameParam.AsString() : "No Room Name";
+                        titleParam?.Set($"{room.Number} {roomName}");
 
                         ElevationSheetLayoutHelper.UpdateLevelDisplay(doc, v, isRowEnd, inputWindow.LevelExtensionMm, log, issues);
                     }
