@@ -107,10 +107,15 @@ namespace Brand_25
             panel5.AddItem(btnData5d);
 
             RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
-            PushButtonData btnDatatesta = new PushButtonData("btn5a", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
+            PushButtonData btnDatatesta = new PushButtonData("btnTestA", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
             btnDatatesta.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
             btnDatatesta.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
             panelTest.AddItem(btnDatatesta);
+
+            PushButtonData btnDataLineA = new PushButtonData("btnLineA", "Consolidate\nLine Styles", Assembly.GetExecutingAssembly().Location, "Brand_25.Line_ConsolidateStyles");
+            btnDataLineA.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
+            btnDataLineA.ToolTip = "Finds unused line styles, then consolidates duplicate line styles sharing the same weight/colour/pattern.";
+            panelTest.AddItem(btnDataLineA);
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
