@@ -1,9 +1,8 @@
-﻿<Window x:Class="Brand_25.Consolidate_LineStyle"
+﻿<Window x:Class="Brand_25.Selection_LineStylePurge"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:Brand_25"
-        Title="Consolidate Duplicate Line Styles"
-        Height="800" Width="1200"
+        Title="Unused Line Styles"
+        Height="1100" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="LightGray"
         WindowStyle="None">
@@ -13,8 +12,6 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
-
         <Style x:Key="TitleBarButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -89,54 +86,35 @@
                    TextWrapping="Wrap" FontSize="16" Foreground="#272727"
                    Style="{StaticResource CustomFontStyle}"
                    Margin="15 8 15 4"
-                   Text="Pick exactly one Survivor per group — shaded rows share a group. Check 'Retain Instances' on any other style whose instances should NOT change; everything else (except instances inside a group or filled region, which can never be changed and are logged separately) will be reassigned to the survivor."/>
+                   Text="Every line style in the project — used and unused. Deletable (unused, non-built-in) styles are pre-selected; used and built-in styles are greyed out and can't be selected."/>
 
         <!-- DataGrid -->
-        <DataGrid x:Name="LineStyleGrid" Grid.Row="2"
+        <DataGrid x:Name="StyleGrid" Grid.Row="2"
                   AutoGenerateColumns="False" IsReadOnly="True"
-                  SelectionMode="Single" CanUserSortColumns="False"
+                  SelectionMode="Single" CanUserSortColumns="True"
                   VirtualizingPanel.IsVirtualizing="False"
                   Background="LightGray" Margin="10">
-
-            <DataGrid.CellStyle>
-                <Style TargetType="DataGridCell">
-                    <Setter Property="Padding" Value="8,4,8,4"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                </Style>
-            </DataGrid.CellStyle>
 
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding GroupShade}" Value="True">
-                            <Setter Property="Background" Value="#D6E4F0"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding GroupShade}" Value="False">
-                            <Setter Property="Background" Value="#FDFEFE"/>
+                        <DataTrigger Binding="{Binding ShouldBeGrayedOut}" Value="True">
+                            <Setter Property="Background" Value="#EEEEEE"/>
+                            <Setter Property="Foreground" Value="#888888"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </DataGrid.RowStyle>
 
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Survivor" Width="70" CanUserSort="False">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <RadioButton HorizontalAlignment="Center" VerticalAlignment="Center"
-                                         IsChecked="{Binding IsSurvivor, Mode=TwoWay}"
-                                         Checked="SurvivorRadio_Checked"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
-                <DataGridTemplateColumn Header="Retain Instances" Width="110" CanUserSort="False">
+                <DataGridTemplateColumn Header="Delete" Width="60" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      IsChecked="{Binding IsRetainInstances, Mode=TwoWay}"
-                                      IsEnabled="{Binding IsSurvivor, Converter={StaticResource InverseBoolConverter}}"
-                                      Checked="RetainInstancesCheckBox_Changed"
-                                      Unchecked="RetainInstancesCheckBox_Changed"/>
+                                      IsChecked="{Binding IsSelectedForDeletion, Mode=TwoWay}"
+                                      IsEnabled="{Binding CanBeDeleted}"
+                                      Checked="DeleteCheckBox_Changed"
+                                      Unchecked="DeleteCheckBox_Changed"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -146,17 +124,17 @@
                 <DataGridTextColumn Header="Colour" Binding="{Binding Colour}" Width="Auto" MinWidth="130"/>
                 <DataGridTextColumn Header="Line Pattern" Binding="{Binding LinePattern}" Width="2*"/>
                 <DataGridTextColumn Header="Instances" Binding="{Binding InstanceCount}" Width="Auto" MinWidth="80"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="2*"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding UsageStatusText}" Width="2*"/>
             </DataGrid.Columns>
         </DataGrid>
 
         <!-- Footer -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="10 0 0 10">
-            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Consolidate"
-                    Width="120" Margin="0 0 10 0" Click="Consolidate_Click"/>
+            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Purge"
+                    Width="100" Margin="0 0 10 0" Click="Continue_Click"/>
             <Button Style="{StaticResource CustomButtonFontStyle}" Content="Cancel"
-                    Width="90" Click="Cancel_Click"/>
+                    Width="100" Click="Cancel_Click"/>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Orientation="Vertical" HorizontalAlignment="Right" Margin="0 0 10 10">

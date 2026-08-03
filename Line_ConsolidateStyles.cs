@@ -87,17 +87,9 @@ namespace Brand_25
             // user explicitly wants these excluded from ALL THREE phases (unused
             // detection, duplicate detection/dialog, and consolidation) entirely,
             // as if they don't exist for this tool's purposes. Filtering here,
-            // once, at the very start, guarantees that.
-            List<Category> excludedTypeB = allLineStyles.Where(IsTypeBExcluded).ToList();
+            // once, at the very start, guarantees that. Not logged — this is
+            // routine, silent filtering, not something the user needs reported.
             allLineStyles = allLineStyles.Where(c => !IsTypeBExcluded(c)).ToList();
-
-            if (excludedTypeB.Count > 0)
-            {
-                log.Add($"{excludedTypeB.Count} built-in style(s) excluded entirely (functional, not purely graphical — e.g. Room Separation, Area Boundary):");
-                foreach (Category c in excludedTypeB.OrderBy(c => SafeCategoryName(c)))
-                    log.Add($"  {SafeCategoryName(c)} (Id {SafeCategoryIdString(c)})");
-                log.Add("");
-            }
 
             if (allLineStyles.Count == 0)
             {
@@ -114,96 +106,67 @@ namespace Brand_25
                 .Where(ce => ce.LineStyle != null)
                 .ToList();
 
-            HashSet<ElementId> usedStyleIds = new HashSet<ElementId>(
-                allCurveElements.Select(ce => ((GraphicsStyle)ce.LineStyle).GraphicsStyleCategory.Id));
+            Dictionary<ElementId, List<CurveElement>> earlyElementsByStyle = allCurveElements
+                .GroupBy(ce => ((GraphicsStyle)ce.LineStyle).GraphicsStyleCategory.Id)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-            List<Category> unusedStyles = allLineStyles.Where(c => !usedStyleIds.Contains(c.Id)).ToList();
+            List<Category> unusedStyles = allLineStyles.Where(c => !earlyElementsByStyle.ContainsKey(c.Id)).ToList();
 
-            // ── Step 3: unused styles — ask the user how to proceed ───────────
+            // ── Step 3: unused styles — let the user pick which ones to purge ──
+            // Shows EVERY style (used and unused) for full context via a DataGrid;
+            // only unused, non-built-in ones (VM_LineStyle.CanBeDeleted) are
+            // actually selectable, pre-checked by default. Used/built-in rows are
+            // greyed out and disabled, not merely unchecked.
 
             if (unusedStyles.Count > 0)
             {
-                List<string> choices = new List<string>
-                {
-                    "Delete the unused line styles for me",
-                    "I'll handle it myself"
-                };
+                List<VM_LineStyle> allStyleVMsRaw = allLineStyles.Select(c => new VM_LineStyle(c, doc)).ToList();
+                List<string> earlyUnreadable = allStyleVMsRaw
+                    .Where(vm => vm.ConstructionError != null)
+                    .Select(vm => $"  {vm.Name} (Id {vm.Category.Id.Value}): {vm.ConstructionError}")
+                    .ToList();
 
-                BulletPointSelector choiceDialog = new BulletPointSelector(
-                    title: "Unused Line Styles Found",
-                    instruction: $"{unusedStyles.Count} line style(s) are not used by any element in this project. How would you like to proceed?",
-                    bulletPoints: choices,
-                    credit: credit,
-                    showCustomInput: false,
-                    singleSelectionMode: true);
+                List<VM_LineStyle> allStyleVMs = allStyleVMsRaw.Where(vm => vm.ConstructionError == null).ToList();
+                foreach (VM_LineStyle vm in allStyleVMs)
+                    vm.InstanceCount = earlyElementsByStyle.TryGetValue(vm.Category.Id, out var l) ? l.Count : 0;
 
-                if (choiceDialog.ShowDialog() != true || choiceDialog.SelectedItems.Count == 0)
+                Selection_LineStylePurge purgeDialog = new Selection_LineStylePurge(allStyleVMs, credit);
+                if (purgeDialog.ShowDialog() != true)
                     return Result.Cancelled;
 
-                bool userWantsToHandleItThemselves = choiceDialog.SelectedItems[0] == "I'll handle it myself";
+                List<VM_LineStyle> toDelete = purgeDialog.SelectedForDeletion;
 
-                if (userWantsToHandleItThemselves)
-                {
-                    log.Add("Unused Line Styles — Log");
-                    log.Add($"Run: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    log.Add($"Project: {doc.Title}");
-                    log.Add(new string('-', 70));
-                    log.Add($"{unusedStyles.Count} unused line style(s):");
-                    log.Add("");
-                    foreach (Category c in unusedStyles.OrderBy(c => SafeCategoryName(c)))
-                        log.Add($"  {SafeCategoryName(c)}  (Id {SafeCategoryIdString(c)})");
-
-                    string unusedLogPath = WriteLog(log, "UnusedLineStyles");
-
-                    new Warning("Unused Line Styles",
-                        $"{unusedStyles.Count} unused line style(s) found - see log.\n\nNo changes were made.",
-                        credit,
-                        revealPath: unusedLogPath).ShowDialog();
-
-                    return Result.Succeeded;
-                }
-
-                // Delete unused styles for the user — skipping any that are
-                // built-in/reserved (negative Id), which can never be deleted via
-                // the API. These are reported separately rather than attempted.
                 int deletedCount = 0;
                 List<string> deleteIssues = new List<string>();
-                List<string> builtInSkipped = new List<string>();
 
                 using (Transaction t = new Transaction(doc, "LW_Delete Unused Line Styles"))
                 {
                     t.Start();
-                    foreach (Category c in unusedStyles)
+                    foreach (VM_LineStyle vm in toDelete)
                     {
-                        if (SafeCategoryIsBuiltIn(c))
-                        {
-                            builtInSkipped.Add($"  {SafeCategoryName(c)} (Id {SafeCategoryIdString(c)})");
-                            continue;
-                        }
-
                         try
                         {
-                            doc.Delete(c.Id);
+                            doc.Delete(vm.Category.Id);
                             deletedCount++;
                         }
                         catch (Exception ex)
                         {
-                            deleteIssues.Add($"  {SafeCategoryName(c)} (Id {SafeCategoryIdString(c)}): could not be deleted — {ex.Message}");
+                            deleteIssues.Add($"  {vm.Name} (Id {vm.Category.Id.Value}): could not be deleted — {ex.Message}");
                         }
                     }
                     t.Commit();
                 }
 
-                log.Add($"Deleted {deletedCount} of {unusedStyles.Count} unused line style(s).");
-                if (builtInSkipped.Count > 0)
-                {
-                    log.Add($"{builtInSkipped.Count} unused style(s) skipped — built-in/reserved, cannot be deleted via the API:");
-                    log.AddRange(builtInSkipped);
-                }
+                log.Add($"Deleted {deletedCount} of {toDelete.Count} selected unused line style(s).");
                 if (deleteIssues.Count > 0)
                 {
                     log.Add("Issues:");
                     log.AddRange(deleteIssues);
+                }
+                if (earlyUnreadable.Count > 0)
+                {
+                    log.Add($"{earlyUnreadable.Count} style(s) could not be read and were excluded from the purge dialog entirely:");
+                    log.AddRange(earlyUnreadable);
                 }
                 log.Add("");
 
@@ -638,16 +601,6 @@ namespace Brand_25
         {
             try { return c.Id.Value.ToString(); }
             catch { return "unknown"; }
-        }
-
-        // Conservative on failure: if Id itself can't be read, this can't confirm
-        // built-in status either way — treated as NOT built-in so a deletion is at
-        // least attempted (and any resulting failure gets caught and logged as
-        // usual) rather than silently skipped.
-        private static bool SafeCategoryIsBuiltIn(Category c)
-        {
-            try { return c.Id.Value < 0; }
-            catch { return false; }
         }
 
         // "Type B" built-in line styles: functional elements first, graphical line

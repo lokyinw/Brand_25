@@ -109,6 +109,41 @@ namespace Brand_25
         // not.
         public int InstanceCount { get; set; }
 
+        // Below this line: state specific to the unused-style purge dialog
+        // (Selection_LineStylePurge), shown before duplicate detection even runs.
+        // Separate from the Survivor/Retain state above, which belongs to the
+        // later Consolidate_LineStyle dialog.
+
+        public bool IsUsed => InstanceCount > 0;
+
+        // Only a style that's both unused AND not built-in can actually be
+        // deleted — built-in ones fail via the API regardless (see IsBuiltIn),
+        // and a used style is left alone here by design (this dialog is only for
+        // the unused-style cleanup step, not general-purpose deletion).
+        public bool CanBeDeleted => !IsUsed && !IsBuiltIn;
+
+        // Row-greying convention, same as VM_Room.ShouldBeGrayedOut.
+        public bool ShouldBeGrayedOut => !CanBeDeleted;
+
+        public string UsageStatusText =>
+            (IsUsed ? "In Use" : "Unused") + (IsBuiltIn ? ", Built-in (cannot be deleted)" : "");
+
+        // Checked by the user (or pre-checked by default for every deletable
+        // style) to mark this style for deletion in the unused-style purge
+        // dialog. Backed by a field and raises PropertyChanged for the same
+        // DataGrid-virtualization reasons as IsSurvivor/IsRetainInstances above.
+        private bool _isSelectedForDeletion;
+        public bool IsSelectedForDeletion
+        {
+            get => _isSelectedForDeletion;
+            set
+            {
+                if (_isSelectedForDeletion == value) return;
+                _isSelectedForDeletion = value;
+                OnPropertyChanged(nameof(IsSelectedForDeletion));
+            }
+        }
+
         // Set if this category could not provide a Projection graphics style (or
         // its associated weight/pattern) at all — some subcategories under
         // OST_Lines apparently don't expose one the normal way (observed as

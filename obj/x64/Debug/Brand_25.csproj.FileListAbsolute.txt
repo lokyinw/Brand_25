@@ -85,3 +85,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimStyle.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_DimStyle.g.cs
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Consolidate_LineStyle.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Consolidate_LineStyle.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_LineStylePurge.baml
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_LineStylePurge.g.cs
