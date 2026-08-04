@@ -114,6 +114,14 @@ namespace Brand_25
 
             List<Category> unusedStyles = allLineStyles.Where(c => !earlyElementsByStyle.ContainsKey(c.Id)).ToList();
 
+            // Styles that were unused at this point but that the user did NOT
+            // select for deletion (either unchecked deliberately, or built-in and
+            // never selectable in the first place) — if any of these later turn
+            // up in a duplicate group, Retain Instances is pre-checked for them in
+            // Consolidate_LineStyle, since declining to purge an unused style is
+            // itself a signal the user wants it left alone, not merged away either.
+            HashSet<ElementId> unusedRetainedIds = new HashSet<ElementId>();
+
             // ── Step 3: unused styles — let the user pick which ones to purge ──
             // Shows EVERY style (used and unused) for full context via a DataGrid;
             // only unused, non-built-in ones (VM_LineStyle.CanBeDeleted) are
@@ -132,8 +140,8 @@ namespace Brand_25
                 foreach (VM_LineStyle vm in allStyleVMs)
                     vm.InstanceCount = earlyElementsByStyle.TryGetValue(vm.Category.Id, out var l) ? l.Count : 0;
 
-                new Warning("Please Note",
-                    "This operation cannot detect line styles employed in Linework tool. Any purging or consolidation of line style used in Linework will revert the view specific graphics to <By Category>.",
+                new Warning("Have you used LINEWORK in this project?",
+                    "Line styles employed in LINEWORK tool cannot be detected via API. Any purging or consolidation of line styles used in LINEWORK will revert the view specific graphics to <By Category>. STOP HERE IF IT MATTERS.",
                     credit).ShowDialog();
 
                 Selection_LineStylePurge purgeDialog = new Selection_LineStylePurge(allStyleVMs, credit);
@@ -141,6 +149,9 @@ namespace Brand_25
                     return Result.Cancelled;
 
                 List<VM_LineStyle> toDelete = purgeDialog.SelectedForDeletion;
+
+                foreach (VM_LineStyle vm in allStyleVMs)
+                    if (!vm.IsUsed && !vm.IsSelectedForDeletion) unusedRetainedIds.Add(vm.Category.Id);
 
                 int deletedCount = 0;
                 List<string> deleteIssues = new List<string>();
@@ -199,6 +210,13 @@ namespace Brand_25
                 .ToList();
 
             List<VM_LineStyle> viewModels = allViewModelsRaw.Where(vm => vm.ConstructionError == null).ToList();
+
+            // Pre-fill Retain Instances for any style that was unused and NOT
+            // selected for deletion back in the purge dialog — see
+            // unusedRetainedIds above for the rationale. This is just the default
+            // the user sees in Consolidate_LineStyle; they can still change it.
+            foreach (VM_LineStyle vm in viewModels)
+                if (unusedRetainedIds.Contains(vm.Category.Id)) vm.IsRetainInstances = true;
 
             foreach (VM_LineStyle vm in viewModels)
                 vm.ComparisonKey = $"{vm.LineWeight}|{vm.Colour}|{vm.LinePattern}";
@@ -275,7 +293,14 @@ namespace Brand_25
 
             List<string> groupLogEntries = new List<string>();
             List<string> filledRegionLogEntries = new List<string>();
-            List<string> filledRegionEditableLogEntries = new List<string>();
+
+            // Keyed per style rather than a flat list, so entries can be filtered
+            // AFTER Step 6 runs — once a style's editable instances (including any
+            // filled-region ones here) have actually been reassigned, there's
+            // nothing distinctive left to report about them; only styles that
+            // weren't consolidated (survivor, retained, or otherwise untouched)
+            // keep their entries in the final log.
+            Dictionary<VM_LineStyle, List<string>> filledRegionEditableEntriesByVm = new Dictionary<VM_LineStyle, List<string>>();
 
             // Track exactly which CurveElement Ids are non-editable (grouped, or a
             // filled-region boundary line whose region is itself inside a group)
@@ -415,16 +440,20 @@ namespace Brand_25
                         {
                             // NOT marked non-editable, NOT added to HeldBackReasons —
                             // these are ordinary editable instances now (the region
-                            // isn't grouped), just logged for visibility since a
-                            // filled region boundary is still a distinctive case
-                            // worth being able to trace.
-                            filledRegionEditableLogEntries.Add($"Line style \"{vm.Name}\" — {editableRegionElems.Count} instance(s) belong to a filled region boundary but ARE editable (region is not in a group):");
+                            // isn't grouped). Stashed per-VM here; only kept in the
+                            // final log if this style ends up NOT actually
+                            // consolidated (see filtering after Step 6).
+                            List<string> vmEntries = new List<string> {
+                                $"Line style \"{vm.Name}\" — {editableRegionElems.Count} instance(s) belong to a filled region boundary but ARE editable (region is not in a group):"
+                            };
 
                             foreach (CurveElement ce in editableRegionElems)
                             {
                                 ElementId frId = filledRegionLineOwners[ce.Id];
-                                filledRegionEditableLogEntries.Add($"    Element Id: {ce.Id.Value}   FilledRegion Id: {frId.Value}");
+                                vmEntries.Add($"    Element Id: {ce.Id.Value}   FilledRegion Id: {frId.Value}");
                             }
+
+                            filledRegionEditableEntriesByVm[vm] = vmEntries;
                         }
                     }
                 }
@@ -436,12 +465,24 @@ namespace Brand_25
             int typesDeleted = 0;
             int reassigned = 0;
             List<string> consolidationLogEntries = new List<string>();
+            HashSet<VM_LineStyle> consolidatedVms = new HashSet<VM_LineStyle>();
 
             Consolidate_LineStyle dialog = new Consolidate_LineStyle(duplicateGroups, credit);
             if (dialog.ShowDialog() == true)
             {
                 Dictionary<VM_LineStyle, VM_LineStyle> survivorMap = dialog.SurvivorSelections;
                 List<VM_LineStyle> retainedStyles = dialog.RetainedStyles;
+
+                // A group's survivor never appears as a key in survivorMap (it's
+                // the destination, not something reassigned) — but it's just as
+                // much a part of the consolidation as the styles merged into it,
+                // so it belongs in this set too, not just the redundant side.
+                consolidatedVms = new HashSet<VM_LineStyle>(survivorMap.Keys);
+                foreach (List<VM_LineStyle> group in duplicateGroups)
+                {
+                    VM_LineStyle survivor = group.FirstOrDefault(vm => vm.IsSurvivor);
+                    if (survivor != null) consolidatedVms.Add(survivor);
+                }
 
                 using (Transaction t = new Transaction(doc, "LW_Consolidate Line Styles"))
                 {
@@ -512,6 +553,17 @@ namespace Brand_25
                         log.Add($"  {vm.Name} (Id {vm.Category.Id.Value}) — Instances: {vm.InstanceCount}");
                     log.Add("");
                 }
+            }
+
+            // Only keep filled-region-editable entries for styles that were NOT
+            // part of an actual consolidation action — i.e. neither reassigned
+            // away (redundant, non-retained) nor a group's survivor. Retained
+            // styles, or styles otherwise never processed, keep their entries.
+            List<string> filledRegionEditableLogEntries = new List<string>();
+            foreach (var kvp in filledRegionEditableEntriesByVm)
+            {
+                if (consolidatedVms.Contains(kvp.Key)) continue;
+                filledRegionEditableLogEntries.AddRange(kvp.Value);
             }
 
             // ── Step 7: write the combined log ─────────────────────────────────
