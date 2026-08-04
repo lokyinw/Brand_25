@@ -3,16 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\line_consolidatestyles.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:line_consolidatestyles.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\warning.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:warning.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\report_dupmaterialkeynote.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:report_dupmaterialkeynote.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     }
   ],
   "DocumentGroupContainers": [
@@ -27,38 +23,24 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "Warning.xaml.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml.cs",
-              "RelativeDocumentMoniker": "Warning.xaml.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Warning.xaml.cs",
-              "RelativeToolTip": "Warning.xaml.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAAiAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-04T12:08:25.035Z",
+              "Title": "Report_DupMaterialKeynote.xaml",
+              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Report_DupMaterialKeynote.xaml",
+              "RelativeDocumentMoniker": "Report_DupMaterialKeynote.xaml",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Report_DupMaterialKeynote.xaml*",
+              "RelativeToolTip": "Report_DupMaterialKeynote.xaml*",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-08-04T23:05:26.482Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Line_ConsolidateStyles.cs",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Line_ConsolidateStyles.cs",
-              "RelativeDocumentMoniker": "Line_ConsolidateStyles.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Line_ConsolidateStyles.cs*",
-              "RelativeToolTip": "Line_ConsolidateStyles.cs*",
-              "ViewState": "AgIAAHkAAAAAAAAAAAAgwI8AAACCAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-04T12:07:34.02Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
               "Title": "App.cs",
               "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
               "RelativeDocumentMoniker": "App.cs",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs",
-              "RelativeToolTip": "App.cs",
-              "ViewState": "AgIAAEYAAAAAAAAAAAAQwFAAAABhAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\App.cs*",
+              "RelativeToolTip": "App.cs*",
+              "ViewState": "AgIAAGcAAAAAAAAAAAAQwG4AAABqAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-23T02:45:39.141Z",
               "EditorCaption": ""

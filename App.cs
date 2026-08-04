@@ -75,14 +75,14 @@ namespace Brand_25
             RibbonPanel panel4 = application.CreateRibbonPanel(tabName, "Text");
             PushButtonData btnData4a = new PushButtonData("btn4a", "Hide\nMark-ups", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_HideTemp");
             PushButtonData btnData4b = new PushButtonData("btn4b", "UnHide\nMark-ups", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_UnhideTemp");
-            PushButtonData btnData4c = new PushButtonData("btn4c", "Consolidate\nText Types", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
+            
             btnData4a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.hide_markup_32.png");
             btnData4b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.unhide_markup_32.png");
-            btnData4c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Text_ConsolidateType_32.png");
+            
             btnData4a.ToolTip = "Hide the Markup and Temp Text by keyword in Text Type";
             btnData4b.ToolTip = "Unhide the hidden text. You must have a hidden text to proceed with.";
-            btnData4c.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
-            panel4.AddItem(btnData4c);
+            
+            
 
             RibbonPanel panel5 = application.CreateRibbonPanel(tabName, "Windows");
             PushButtonData btnData5a = new PushButtonData("btn5a", "Assign\nWin Mark", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_AssignMark");
@@ -91,8 +91,8 @@ namespace Brand_25
             PushButtonData btnData5d = new PushButtonData("btn5d", "Win Elev\non Sheet", Assembly.GetExecutingAssembly().Location, "Brand_25.Win_PlaceElevOnSheets");
             btnData5a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Win_Mark_32.png"); // swap for a real icon
             btnData5b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Win_CreateEle_32.png"); // swap for a real icon
-            btnData5c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnData5d.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.elev_on_sheet_32.png");
+            btnData5c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Win_Dim_48.png"); // swap for a real icon
+            btnData5d.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Win_PlaceOnSheet_64.png");
             btnData5a.ToolTip = "Assigns Mark/BA_Mark to windows and doors based on the room(s) they sit between.";
             btnData5b.ToolTip = "Create Elevations for Aluminium Windows and Doors";
             btnData5c.ToolTip = "Tie Dimensions on Window Elevations";
@@ -106,16 +106,21 @@ namespace Brand_25
             panel5.AddItem(btnData5c);
             panel5.AddItem(btnData5d);
 
-            RibbonPanel panelTest = application.CreateRibbonPanel(tabName, "Test");
-            PushButtonData btnDatatesta = new PushButtonData("btnTestA", "Duplicate\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
-            btnDatatesta.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnDatatesta.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
-            panelTest.AddItem(btnDatatesta);
+            RibbonPanel panel6 = application.CreateRibbonPanel(tabName, "Consolidation");
+            PushButtonData btnData6a = new PushButtonData("btn6a", "Find Duplicated\nKeynotes", Assembly.GetExecutingAssembly().Location, "Brand_25.Mat_FindDupKeynote");
+            btnData6a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Keynote_Consolidate_64.png"); // swap for a real icon
+            btnData6a.ToolTip = "Find all materials that share the same Keynote value and display them in a grouped report.";
+            panel6.AddItem(btnData6a);
 
-            PushButtonData btnDataLineA = new PushButtonData("btnLineA", "Consolidate\nLine Styles", Assembly.GetExecutingAssembly().Location, "Brand_25.Line_ConsolidateStyles");
-            btnDataLineA.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            btnDataLineA.ToolTip = "Finds unused line styles, then consolidates duplicate line styles sharing the same weight/colour/pattern.";
-            panelTest.AddItem(btnDataLineA);
+            PushButtonData btnData6b = new PushButtonData("btn6b", "Consolidate\nLine Styles", Assembly.GetExecutingAssembly().Location, "Brand_25.Line_ConsolidateStyles");
+            btnData6b.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Line_Consolidate_64.png");
+            btnData6b.ToolTip = "Finds unused line styles, then consolidates duplicate line styles sharing the same weight/colour/pattern.";
+            panel6.AddItem(btnData6b);
+
+            PushButtonData btnData6c = new PushButtonData("btn6c", "Consolidate\nText Types", Assembly.GetExecutingAssembly().Location, "Brand_25.Text_ConsolidateTypes");
+            btnData6c.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Text_ConsolidateType_32.png");
+            btnData6c.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
+            panel6.AddItem(btnData6c);
 
             //PushButtonData btnDataLineB = new PushButtonData("btnLineB", "Test filled region", Assembly.GetExecutingAssembly().Location, "Brand_25.Test_FilledRegionModifier");
             //btnDataLineB.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");

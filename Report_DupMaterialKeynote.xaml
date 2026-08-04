@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Brand_25"
         Title="Duplicate Material Keynotes"
-        Height="600" Width="1000"
+        Height="1000" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="LightGray"
         WindowStyle="None">
@@ -102,9 +102,9 @@
 
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Keynote"     Binding="{Binding Keynote}"     Width="Auto" MinWidth="100"/>
-                <DataGridTextColumn Header="Material Name" Binding="{Binding Name}"      Width="3*"/>
-                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="2*"/>
-                <DataGridTextColumn Header="Comments"    Binding="{Binding Comments}"    Width="2*"/>
+                <DataGridTextColumn Header="Material Name" Binding="{Binding Name}"      Width="4*"/>
+                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="1*"/>
+                <DataGridTextColumn Header="Comments"    Binding="{Binding Comments}"    Width="1*"/>
                 <DataGridTextColumn Header="Colour"      Binding="{Binding Colour}"      Width="Auto" MinWidth="130"/>
             </DataGrid.Columns>
         </DataGrid>

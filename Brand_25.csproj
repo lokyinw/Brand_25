@@ -31,9 +31,13 @@
 
   <ItemGroup>
     <None Remove="Resources\Images\elev_on_sheet_32.png" />
+    <None Remove="Resources\Images\Keynote_Consolidate_64.png" />
+    <None Remove="Resources\Images\Line_Consolidate_64.png" />
     <None Remove="Resources\Images\Text_ConsolidateType_32.png" />
     <None Remove="Resources\Images\Win_CreateEle_32.png" />
+    <None Remove="Resources\Images\Win_Dim_48.png" />
     <None Remove="Resources\Images\Win_Mark_32.png" />
+    <None Remove="Resources\Images\Win_PlaceOnSheet_64.png" />
     <None Remove="Resources\Images\Win_Tag_32.png" />
   </ItemGroup>
 
@@ -69,6 +73,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\Images\close_32.png" />
     <EmbeddedResource Include="Resources\Images\elev_on_sheet_32.png" />
+    <EmbeddedResource Include="Resources\Images\Keynote_Consolidate_64.png" />
+    <EmbeddedResource Include="Resources\Images\Line_Consolidate_64.png" />
     <EmbeddedResource Include="Resources\Images\maximize_32.png" />
     <EmbeddedResource Include="Resources\Images\minimize_32.png" />
     <EmbeddedResource Include="Resources\Images\restore_32.png" />
@@ -85,7 +91,9 @@
     <EmbeddedResource Include="Resources\Images\Room_Re-center_32.png" />
     <EmbeddedResource Include="Resources\Images\Wall_Joint_Disallow_32.png" />
     <EmbeddedResource Include="Resources\Images\Win_CreateEle_32.png" />
+    <EmbeddedResource Include="Resources\Images\Win_Dim_48.png" />
     <EmbeddedResource Include="Resources\Images\Win_Mark_32.png" />
+    <EmbeddedResource Include="Resources\Images\Win_PlaceOnSheet_64.png" />
     <EmbeddedResource Include="Resources\Images\Win_Tag_32.png" />
   </ItemGroup>
 

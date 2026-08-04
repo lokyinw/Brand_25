@@ -140,9 +140,17 @@ namespace Brand_25
                 foreach (VM_LineStyle vm in allStyleVMs)
                     vm.InstanceCount = earlyElementsByStyle.TryGetValue(vm.Category.Id, out var l) ? l.Count : 0;
 
-                new Warning("Have you used LINEWORK in this project?",
+                // Warning.xaml's OK button explicitly sets DialogResult = true;
+                // its title-bar X (there is no Cancel button) just calls Close()
+                // without setting it, so ShowDialog() returns null in that case.
+                // Closing the dialog without clicking OK means the user wants to
+                // stop here, not silently proceed into the purge dialog.
+                bool? lineworkWarningResult = new Warning("Have you used LINEWORK in this project?",
                     "Line styles employed in LINEWORK tool cannot be detected via API. Any purging or consolidation of line styles used in LINEWORK will revert the view specific graphics to <By Category>. STOP HERE IF IT MATTERS.",
                     credit).ShowDialog();
+
+                if (lineworkWarningResult != true)
+                    return Result.Cancelled;
 
                 Selection_LineStylePurge purgeDialog = new Selection_LineStylePurge(allStyleVMs, credit);
                 if (purgeDialog.ShowDialog() != true)
