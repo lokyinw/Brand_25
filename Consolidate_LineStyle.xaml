@@ -89,7 +89,7 @@
                    TextWrapping="Wrap" FontSize="16" Foreground="#272727"
                    Style="{StaticResource CustomFontStyle}"
                    Margin="15 8 15 4"
-                   Text="Pick exactly one Survivor per group — shaded rows share a group. Check 'Retain Instances' on any other style whose instances should NOT change; everything else (except instances inside a group or filled region, which can never be changed and are logged separately) will be reassigned to the survivor."/>
+                   Text="Pick exactly one Survivor per group — shaded rows share a group. Check 'Retain Instances' on any other style whose instances should NOT change; everything else will be reassigned to the survivor, except instances inside a group (or a filled region that is itself inside a group), which can never be changed and are logged separately."/>
 
         <!-- DataGrid -->
         <DataGrid x:Name="LineStyleGrid" Grid.Row="2"

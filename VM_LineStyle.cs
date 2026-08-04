@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace Brand_25
 {
@@ -102,7 +103,7 @@ namespace Brand_25
         // modify at all (inside a model/detail group, or a filled region's own
         // boundary line) — these instances are always left untouched regardless of
         // the Retain Instances checkbox, since there's no choice involved.
-        public bool HasBlockingInstances => HeldBackReasons.Contains("In Group") || HeldBackReasons.Contains("In Filled Region");
+        public bool HasBlockingInstances => HeldBackReasons.Any(r => r == "In Group" || r.StartsWith("In Filled Region"));
 
         // Populated by the command before showing the dialog — how many
         // CurveElements (project-wide) currently use this line style, blocking or

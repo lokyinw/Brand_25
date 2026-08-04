@@ -88,7 +88,7 @@ namespace Brand_25
             ContentMarginTopBox.Text = "20";
             ContentMarginBottomBox.Text = "10";
             ContentMarginLeftBox.Text = "25";
-            ContentMarginRightBox.Text = "100"; // Drawing Information Area width: 841 - 720 - 21
+            ContentMarginRightBox.Text = "150"; // Drawing Information Area width: 841 - 720 - 21 - 50
 
             XSpacingBox.Text = "20";
             YSpacingBox.Text = "35";

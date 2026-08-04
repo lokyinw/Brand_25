@@ -41,15 +41,17 @@ namespace Brand_25
     //     checkbox lets the user opt any non-survivor style OUT of reassignment
     //     entirely, independent of the survivor choice.
     //
-    //  3. For every non-survivor, non-retained style: its EDITABLE instances (not
-    //     inside a model/detail group, not a filled region's own boundary/sketch
-    //     line — found via FilledRegion.GetDependentElements(ElementFilter)) are
-    //     reassigned to the survivor. Afterward, that style's subcategory is
-    //     deleted only if it's not built-in AND has no remaining group/filled-
-    //     region instances — otherwise it's kept (with the reason logged). Every
-    //     group/filled-region instance is logged individually (element Id, owning
-    //     group/region Id, group kind, and view/sheet for detail groups and
-    //     filled regions).
+    //  3. For every non-survivor, non-retained style: its EDITABLE instances are
+    //     reassigned to the survivor. An instance is non-editable only if it's
+    //     inside a model/detail group, OR it's a filled region's own boundary/
+    //     sketch line (found via FilledRegion.GetDependentElements(ElementFilter))
+    //     AND that filled region is itself inside a group — a filled region's
+    //     boundary lines are otherwise fully editable, confirmed by direct
+    //     testing. Afterward, that style's subcategory is deleted only if it's
+    //     not built-in AND has no remaining non-editable instances — otherwise
+    //     it's kept (with the reason logged). Every non-editable instance is
+    //     logged individually (element Id, owning group/region Id, group kind,
+    //     and view/sheet for detail groups and grouped filled regions).
     [Transaction(TransactionMode.Manual)]
     public class Line_ConsolidateStyles : IExternalCommand
     {
@@ -129,6 +131,10 @@ namespace Brand_25
                 List<VM_LineStyle> allStyleVMs = allStyleVMsRaw.Where(vm => vm.ConstructionError == null).ToList();
                 foreach (VM_LineStyle vm in allStyleVMs)
                     vm.InstanceCount = earlyElementsByStyle.TryGetValue(vm.Category.Id, out var l) ? l.Count : 0;
+
+                new Warning("Please Note",
+                    "This operation cannot detect line styles employed in Linework tool. Any purging or consolidation of line style used in Linework will revert the view specific graphics to <By Category>.",
+                    credit).ShowDialog();
 
                 Selection_LineStylePurge purgeDialog = new Selection_LineStylePurge(allStyleVMs, credit);
                 if (purgeDialog.ShowDialog() != true)
@@ -258,19 +264,24 @@ namespace Brand_25
                 if (vm.IsBuiltIn) vm.HeldBackReasons.Add("Built-in");
 
             // Filled-region boundary lines: FilledRegion.GetDependentElements(filter)
-            // reliably returns the region's own sketch/boundary CurveElements — this
-            // replaces the earlier FilledRegionType-parameter guesswork, which
-            // couldn't be confirmed against the live API.
-            Dictionary<ElementId, ElementId> filledRegionLineOwners = BuildFilledRegionLineOwners(doc);
+            // reliably returns the region's own sketch/boundary CurveElements.
+            // Confirmed via direct testing that these CAN be reassigned via the API
+            // like any ordinary CurveElement — the only real restriction is the
+            // same one that applies to everything else: if the FILLED REGION
+            // ITSELF sits inside a group, its boundary lines inherit that group's
+            // "cannot be touched" restriction (mirroring how any grouped element
+            // behaves), otherwise they're fully editable.
+            Dictionary<ElementId, ElementId> filledRegionLineOwners = BuildFilledRegionLineOwners(doc, out HashSet<ElementId> groupedFilledRegionIds);
 
             List<string> groupLogEntries = new List<string>();
             List<string> filledRegionLogEntries = new List<string>();
+            List<string> filledRegionEditableLogEntries = new List<string>();
 
-            // Track exactly which CurveElement Ids are non-editable (grouped or a
-            // filled-region boundary line) per style, so Step 6 below only ever
-            // reassigns the truly editable ones — everything else is left alone
-            // regardless of the user's Retain Instances choice, since the API
-            // simply cannot touch them.
+            // Track exactly which CurveElement Ids are non-editable (grouped, or a
+            // filled-region boundary line whose region is itself inside a group)
+            // per style, so Step 6 below only ever reassigns the truly editable
+            // ones — everything else is left alone regardless of the user's
+            // Retain Instances choice, since the API simply cannot touch them.
             Dictionary<ElementId, HashSet<ElementId>> nonEditableInstanceIdsByStyle = new Dictionary<ElementId, HashSet<ElementId>>();
 
             void MarkNonEditable(ElementId styleCategoryId, ElementId curveElementId)
@@ -353,35 +364,67 @@ namespace Brand_25
                     List<CurveElement> filledRegionElems = elems.Where(e => filledRegionLineOwners.ContainsKey(e.Id)).ToList();
                     if (filledRegionElems.Count > 0)
                     {
-                        vm.HeldBackReasons.Add("In Filled Region");
-                        filledRegionLogEntries.Add($"Line style \"{vm.Name}\" — {filledRegionElems.Count} instance(s) belong to a filled region boundary (cannot be changed):");
+                        List<CurveElement> blockedByGroupedRegion = filledRegionElems
+                            .Where(e => groupedFilledRegionIds.Contains(filledRegionLineOwners[e.Id]))
+                            .ToList();
+                        List<CurveElement> editableRegionElems = filledRegionElems
+                            .Except(blockedByGroupedRegion)
+                            .ToList();
 
-                        foreach (CurveElement ce in filledRegionElems)
+                        if (blockedByGroupedRegion.Count > 0)
                         {
-                            MarkNonEditable(vm.Category.Id, ce.Id);
+                            vm.HeldBackReasons.Add("In Filled Region (region is in a group)");
+                            filledRegionLogEntries.Add($"Line style \"{vm.Name}\" — {blockedByGroupedRegion.Count} instance(s) belong to a filled region that is itself inside a group (cannot be changed):");
 
-                            ElementId frId = filledRegionLineOwners[ce.Id];
-                            FilledRegion fr = doc.GetElement(frId) as FilledRegion;
-                            string viewInfo = "";
-                            if (fr != null)
+                            foreach (CurveElement ce in blockedByGroupedRegion)
                             {
-                                try
-                                {
-                                    View ownerView = doc.GetElement(fr.OwnerViewId) as View;
-                                    if (ownerView is ViewSheet sheet)
-                                        viewInfo = $"  Sheet: \"{sheet.SheetNumber} - {sheet.Name}\"";
-                                    else if (ownerView != null)
-                                        viewInfo = $"  View: \"{ownerView.Name}\"";
-                                }
-                                catch
-                                {
-                                    // Non-essential — leave viewInfo blank rather than
-                                    // letting a view-lookup failure abort the command.
-                                }
-                            }
+                                MarkNonEditable(vm.Category.Id, ce.Id);
 
-                            filledRegionLogEntries.Add(
-                                $"    Element Id: {ce.Id.Value}   FilledRegion Id: {frId.Value}{viewInfo}");
+                                ElementId frId = filledRegionLineOwners[ce.Id];
+                                FilledRegion fr = doc.GetElement(frId) as FilledRegion;
+                                string groupInfo = "";
+                                string viewInfo = "";
+                                if (fr != null)
+                                {
+                                    try
+                                    {
+                                        Group grp = doc.GetElement(fr.GroupId) as Group;
+                                        if (grp != null)
+                                        {
+                                            groupInfo = $"   Group Id: {fr.GroupId.Value}";
+                                            View ownerView = doc.GetElement(grp.OwnerViewId) as View;
+                                            if (ownerView is ViewSheet sheet)
+                                                viewInfo = $"  Sheet: \"{sheet.SheetNumber} - {sheet.Name}\"";
+                                            else if (ownerView != null)
+                                                viewInfo = $"  View: \"{ownerView.Name}\"";
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // Non-essential — leave blank rather than
+                                        // letting a lookup failure abort the command.
+                                    }
+                                }
+
+                                filledRegionLogEntries.Add(
+                                    $"    Element Id: {ce.Id.Value}   FilledRegion Id: {frId.Value}{groupInfo}{viewInfo}");
+                            }
+                        }
+
+                        if (editableRegionElems.Count > 0)
+                        {
+                            // NOT marked non-editable, NOT added to HeldBackReasons —
+                            // these are ordinary editable instances now (the region
+                            // isn't grouped), just logged for visibility since a
+                            // filled region boundary is still a distinctive case
+                            // worth being able to trace.
+                            filledRegionEditableLogEntries.Add($"Line style \"{vm.Name}\" — {editableRegionElems.Count} instance(s) belong to a filled region boundary but ARE editable (region is not in a group):");
+
+                            foreach (CurveElement ce in editableRegionElems)
+                            {
+                                ElementId frId = filledRegionLineOwners[ce.Id];
+                                filledRegionEditableLogEntries.Add($"    Element Id: {ce.Id.Value}   FilledRegion Id: {frId.Value}");
+                            }
                         }
                     }
                 }
@@ -510,8 +553,15 @@ namespace Brand_25
 
             if (filledRegionLogEntries.Count > 0)
             {
-                log.Add("Instances belonging to a filled region boundary (cannot be changed via the API):");
+                log.Add("Instances belonging to a filled region that is itself inside a group (cannot be changed via the API):");
                 log.AddRange(filledRegionLogEntries);
+                log.Add("");
+            }
+
+            if (filledRegionEditableLogEntries.Count > 0)
+            {
+                log.Add("Instances belonging to a filled region boundary that ARE editable (region not in a group — included in normal consolidation):");
+                log.AddRange(filledRegionEditableLogEntries);
                 log.Add("");
             }
 
@@ -536,12 +586,17 @@ namespace Brand_25
         }
 
         // Maps each filled region's own boundary/sketch CurveElement Id to the
-        // FilledRegion it belongs to, via FilledRegion.GetDependentElements(filter) —
-        // the confirmed way to retrieve a region's dependent sketch lines, rather
-        // than guessing at a FilledRegionType parameter.
-        private static Dictionary<ElementId, ElementId> BuildFilledRegionLineOwners(Document doc)
+        // FilledRegion it belongs to, via FilledRegion.GetDependentElements(filter)
+        // — the confirmed way to retrieve a region's dependent sketch lines.
+        // Confirmed by direct testing that these lines' LineStyle CAN be
+        // reassigned via the API. groupedFilledRegionIds separately reports which
+        // filled regions are themselves inside a group — their boundary lines are
+        // the only ones still treated as non-editable, mirroring how any other
+        // grouped element behaves.
+        private static Dictionary<ElementId, ElementId> BuildFilledRegionLineOwners(Document doc, out HashSet<ElementId> groupedFilledRegionIds)
         {
             Dictionary<ElementId, ElementId> owners = new Dictionary<ElementId, ElementId>();
+            groupedFilledRegionIds = new HashSet<ElementId>();
 
             List<FilledRegion> filledRegions = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegion))
@@ -552,6 +607,19 @@ namespace Brand_25
 
             foreach (FilledRegion fr in filledRegions)
             {
+                try
+                {
+                    if (fr.GroupId != ElementId.InvalidElementId)
+                        groupedFilledRegionIds.Add(fr.Id);
+                }
+                catch
+                {
+                    // If GroupId itself can't be read, conservatively assume NOT
+                    // grouped — this only affects whether the region's lines are
+                    // treated as editable; any actual reassignment failure would
+                    // still surface as its own logged issue downstream.
+                }
+
                 ICollection<ElementId> dependentLineIds;
                 try
                 {

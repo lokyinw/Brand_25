@@ -117,6 +117,11 @@ namespace Brand_25
             btnDataLineA.ToolTip = "Finds unused line styles, then consolidates duplicate line styles sharing the same weight/colour/pattern.";
             panelTest.AddItem(btnDataLineA);
 
+            //PushButtonData btnDataLineB = new PushButtonData("btnLineB", "Test filled region", Assembly.GetExecutingAssembly().Location, "Brand_25.Test_FilledRegionModifier");
+            //btnDataLineB.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
+            //btnDataLineB.ToolTip = "test";
+            //panelTest.AddItem(btnDataLineB);
+
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
             PushButton pbHide = sb.AddPushButton(btnData4a);
