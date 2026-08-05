@@ -112,7 +112,9 @@
         <!-- Footer -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="10 0 0 10">
-            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Close" Width="80" Click="Close_Click"/>
+            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Close" Width="80" Margin="0 0 10 0" Click="Close_Click"/>
+            <Button x:Name="OpenFolderButton" Style="{StaticResource CustomButtonFontStyle}" Content="Log Folder" Width="110"
+                    Click="OpenFolder_Click" Visibility="Collapsed"/>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Vertical" HorizontalAlignment="Right" Margin="0 0 10 10">

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -12,6 +13,12 @@ namespace Brand_25
 {
     public partial class Report_DupMaterialKeynote : Window
     {
+        // Path to the CSV export of this report, written once in the constructor so
+        // it exists regardless of how the user closes the dialog (Close button or
+        // the title-bar X). Null if the write failed — OpenFolderButton stays
+        // hidden in that case.
+        private readonly string _csvPath;
+
         public Report_DupMaterialKeynote(List<List<Material>> duplicateGroups, string credit = "Report_DupMaterialKeynote Default")
         {
             InitializeComponent();
@@ -37,6 +44,78 @@ namespace Brand_25
             }
 
             MaterialsDataGrid.ItemsSource = rows;
+
+            // Export the same rows the DataGrid shows, in the same column order, so
+            // the report survives closing the dialog. Written eagerly here — never
+            // triggered from Close_Click/buttonClose_Click, since there's no
+            // guarantee the user goes through either of those (title-bar X etc.).
+            _csvPath = WriteCsv(rows);
+            if (_csvPath != null)
+            {
+                OpenFolderButton.Visibility = System.Windows.Visibility.Visible;
+            }
+        }
+
+        private static string WriteCsv(List<VM_DupMaterialRow> rows)
+        {
+            try
+            {
+                string tempFolder = Path.GetTempPath();
+                string fileName = $"DuplicateMaterialKeynotes_{DateTime.Now:yyyy-MM-dd_HHmmss}.csv";
+                string csvPath = Path.Combine(tempFolder, fileName);
+
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine(string.Join(",", "Keynote", "Material Name", "Description", "Comments", "Colour"));
+
+                foreach (VM_DupMaterialRow row in rows)
+                {
+                    sb.AppendLine(string.Join(",",
+                        CsvEscape(row.Keynote),
+                        CsvEscape(row.Name),
+                        CsvEscape(row.Description),
+                        CsvEscape(row.Comments),
+                        CsvEscape(row.Colour)));
+                }
+
+                File.WriteAllText(csvPath, sb.ToString());
+                return csvPath;
+            }
+            catch
+            {
+                // If the CSV can't be written, the dialog just doesn't show the
+                // Log Folder button — the on-screen report is unaffected.
+                return null;
+            }
+        }
+
+        // Quotes any field containing a comma, quote, or newline; doubles up
+        // embedded quotes per standard CSV escaping.
+        private static string CsvEscape(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+
+            if (value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0)
+            {
+                return "\"" + value.Replace("\"", "\"\"") + "\"";
+            }
+            return value;
+        }
+
+        private void OpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_csvPath)) return;
+
+            try
+            {
+                if (File.Exists(_csvPath))
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_csvPath}\"");
+                else
+                    new Warning("Not Found", $"Could not find:\n{_csvPath}", "Report_DupMaterialKeynote").ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                new Warning("Could Not Open Folder", ex.Message, "Report_DupMaterialKeynote").ShowDialog();
+            }
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
