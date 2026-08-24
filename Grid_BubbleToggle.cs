@@ -11,16 +11,14 @@ namespace Brand_25
     [Transaction(TransactionMode.Manual)]
     public class Grid_BubbleToggle : IExternalCommand
     {
-        private string credit = "Last Modified by Lok on 2025-04-30. Beta 0.90";
+        private string credit = "Last Modified by Lok on 2026-08-12. Beta 0.91";
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
-            // Get the Revit application and document
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
 
-            // Ensure the active view is a plan view
             if (doc.ActiveView.ViewType != ViewType.FloorPlan &&
                 doc.ActiveView.ViewType != ViewType.CeilingPlan &&
                 doc.ActiveView.ViewType != ViewType.AreaPlan)
@@ -31,44 +29,91 @@ namespace Brand_25
 
             try
             {
-                // Step 1: Select grids to modify
-                new Warning("Toggle Grid Bubbles", "Select the grids.", credit).ShowDialog();
-                List<Grid> selectedGrids = GetUserSelectedGrids(uiDoc);
+                List<Grid> selectedGrids = GetPreSelectedGrids(uiDoc);
+
+                if (selectedGrids.Count == 0)
+                {
+                    new Warning("Toggle Grid Bubbles", "Select the grids.", credit).ShowDialog();
+                    selectedGrids = GetUserSelectedGrids(uiDoc);
+                }
+
                 if (selectedGrids == null || selectedGrids.Count == 0)
                 {
                     new Warning("Oops...", "No grids selected. We have to abort.", credit).ShowDialog();
                     return Result.Failed;
                 }
 
-                // Step 2: Select boundary line (detail line or grid)
-                new Warning("Toggle Grid Bubbles", "Select a detail line or grid line that intersects your selected grids.\nBubbles closest to this line will be toggled.", credit).ShowDialog();
-                Reference lineRef = uiDoc.Selection.PickObject(ObjectType.Element, new LineSelectionFilter(), "Select a detail line or grid line...");
-                Element lineElement = doc.GetElement(lineRef);
+                List<XYZ> fencePointsRaw = new List<XYZ>();
 
-                Curve boundaryCurve = null;
-                if (lineElement is DetailLine detailLine)
+                Transaction sketchTrans = new Transaction(doc, "LW_Sketch Fence Line (temporary)");
+                sketchTrans.Start();
+                try
                 {
-                    boundaryCurve = detailLine.GeometryCurve;
+                    while (true)
+                    {
+                        XYZ pt;
+                        try
+                        {
+                            string prompt = fencePointsRaw.Count == 0
+                                ? "Click the first fence point (Esc to cancel)"
+                                : "Click next fence point, or press Esc to finish";
+                            // No snapping — ObjectSnapTypes.None — so the fence lands
+                            // exactly where clicked, not pulled onto nearby geometry.
+                            pt = uiDoc.Selection.PickPoint(ObjectSnapTypes.None, prompt);
+                        }
+                        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+                        {
+                            break;
+                        }
+
+                        if (fencePointsRaw.Count > 0)
+                        {
+                            XYZ prev = fencePointsRaw[fencePointsRaw.Count - 1];
+                            if (prev.DistanceTo(pt) < 1e-9)
+                            {
+                                continue;
+                            }
+
+                            try
+                            {
+                                doc.Create.NewDetailCurve(doc.ActiveView, Line.CreateBound(prev, pt));
+                                doc.Regenerate();
+                            }
+                            catch
+                            {
+                                // Purely cosmetic — keep collecting points regardless.
+                            }
+                        }
+
+                        fencePointsRaw.Add(pt);
+                    }
                 }
-                else if (lineElement is Grid grid)
+                finally
                 {
-                    boundaryCurve = grid.GetCurvesInView(DatumExtentType.ViewSpecific, uiDoc.ActiveView).FirstOrDefault();
+                    sketchTrans.RollBack();
                 }
 
-                if (boundaryCurve == null)
+                if (fencePointsRaw.Count < 2)
                 {
-                    new Warning("...um...", "The selected element doesn't provide a valid curve.", credit).ShowDialog();
+                    new Warning("Oops...", "Need at least two points to sketch a fence line. We have to abort.", credit).ShowDialog();
                     return Result.Failed;
                 }
 
-                // Flatten curves to 2D for intersection calculations
-                Line boundaryLine2D = Line.CreateBound(
-                    new XYZ(boundaryCurve.GetEndPoint(0).X, boundaryCurve.GetEndPoint(0).Y, 0),
-                    new XYZ(boundaryCurve.GetEndPoint(1).X, boundaryCurve.GetEndPoint(1).Y, 0));
+                List<Line> fenceSegments = new List<Line>();
+                for (int i = 0; i < fencePointsRaw.Count - 1; i++)
+                {
+                    XYZ p0 = new XYZ(fencePointsRaw[i].X, fencePointsRaw[i].Y, 0);
+                    XYZ p1 = new XYZ(fencePointsRaw[i + 1].X, fencePointsRaw[i + 1].Y, 0);
+                    if (p0.DistanceTo(p1) < 1e-9) continue;
+                    fenceSegments.Add(Line.CreateBound(p0, p1));
+                }
 
-                Line boundaryLineUB = Line.CreateUnbound(boundaryLine2D.GetEndPoint(0), boundaryLine2D.Direction);
+                if (fenceSegments.Count == 0)
+                {
+                    new Warning("Oops...", "The fence line has no usable segments. We have to abort.", credit).ShowDialog();
+                    return Result.Failed;
+                }
 
-                // Start transaction
                 using (Transaction trans = new Transaction(doc, "LW_Toggle Grid Bubbles"))
                 {
                     trans.Start();
@@ -76,42 +121,36 @@ namespace Brand_25
                     int bubblesToggled = 0;
                     foreach (Grid grid in selectedGrids)
                     {
-                        // Get grid curve in current view
                         Curve gridCurve = grid.GetCurvesInView(DatumExtentType.ViewSpecific, uiDoc.ActiveView).FirstOrDefault();
                         if (gridCurve == null) continue;
 
-                        // Flatten grid curve to 2D
-                        Line gridLine2D = Line.CreateBound(
-                            new XYZ(gridCurve.GetEndPoint(0).X, gridCurve.GetEndPoint(0).Y, 0),
-                            new XYZ(gridCurve.GetEndPoint(1).X, gridCurve.GetEndPoint(1).Y, 0));
+                        XYZ gridStart2D = new XYZ(gridCurve.GetEndPoint(0).X, gridCurve.GetEndPoint(0).Y, 0);
+                        XYZ gridEnd2D = new XYZ(gridCurve.GetEndPoint(1).X, gridCurve.GetEndPoint(1).Y, 0);
+                        if (gridStart2D.DistanceTo(gridEnd2D) < 1e-9) continue;
+                        Line gridLine2D = Line.CreateBound(gridStart2D, gridEnd2D);
 
-                        Line gridLineUB = Line.CreateUnbound(gridLine2D.GetEndPoint(0), gridLine2D.Direction);
+                        HashSet<DatumEnds> endsToToggle = new HashSet<DatumEnds>();
 
-                        // Check intersection
-                        IntersectionResultArray intersectionResults;
-                        SetComparisonResult result = gridLineUB.Intersect(boundaryLineUB, out intersectionResults);
-
-                        if (result == SetComparisonResult.Overlap)
+                        foreach (Line fenceSegment in fenceSegments)
                         {
-                            XYZ intersectionPoint = intersectionResults.get_Item(0).XYZPoint;
+                            IntersectionResultArray intersectionResults;
+                            SetComparisonResult result = gridLine2D.Intersect(fenceSegment, out intersectionResults);
 
-                            // Determine which bubble is closer to the intersection point
-                            double distanceToStart = intersectionPoint.DistanceTo(gridLine2D.GetEndPoint(0));
-                            double distanceToEnd = intersectionPoint.DistanceTo(gridLine2D.GetEndPoint(1));
+                            if (result != SetComparisonResult.Overlap || intersectionResults == null) continue;
 
-                            // Toggle the closer bubble
-                            if (distanceToStart < distanceToEnd)
+                            foreach (IntersectionResult ir in intersectionResults)
                             {
-                                // Start bubble is closer
-                                ToggleGridBubble(grid, DatumEnds.End0, uiDoc.ActiveView);
-                                bubblesToggled++;
+                                XYZ intersectionPoint = ir.XYZPoint;
+                                double distanceToStart = intersectionPoint.DistanceTo(gridStart2D);
+                                double distanceToEnd = intersectionPoint.DistanceTo(gridEnd2D);
+                                endsToToggle.Add(distanceToStart < distanceToEnd ? DatumEnds.End0 : DatumEnds.End1);
                             }
-                            else
-                            {
-                                // End bubble is closer
-                                ToggleGridBubble(grid, DatumEnds.End1, uiDoc.ActiveView);
-                                bubblesToggled++;
-                            }
+                        }
+
+                        foreach (DatumEnds end in endsToToggle)
+                        {
+                            ToggleGridBubble(grid, end, uiDoc.ActiveView);
+                            bubblesToggled++;
                         }
                     }
 
@@ -123,7 +162,7 @@ namespace Brand_25
                     }
                     else
                     {
-                        new Warning("Hmm...", "No grid bubbles were toggled. Make sure your selected grids intersect with the boundary line.", credit).ShowDialog();
+                        new Warning("Hmm...", "No grid bubbles were toggled. Make sure your fence line actually crosses your selected grids.", credit).ShowDialog();
                     }
                 }
 
@@ -131,7 +170,6 @@ namespace Brand_25
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
             {
-                // User canceled the operation
                 return Result.Cancelled;
             }
             catch (Exception ex)
@@ -144,18 +182,20 @@ namespace Brand_25
 
         private void ToggleGridBubble(Grid grid, DatumEnds end, View view)
         {
-            // Get current bubble visibility
             bool isVisible = grid.IsBubbleVisibleInView(end, view);
-
-            // Set new visibility (toggle)
             if (isVisible)
-            {
                 grid.HideBubbleInView(end, view);
-            }
             else
-            {
                 grid.ShowBubbleInView(end, view);
-            }
+        }
+
+        private List<Grid> GetPreSelectedGrids(UIDocument uidoc)
+        {
+            Document doc = uidoc.Document;
+            return uidoc.Selection.GetElementIds()
+                .Select(id => doc.GetElement(id))
+                .OfType<Grid>()
+                .ToList();
         }
 
         private List<Grid> GetUserSelectedGrids(UIDocument uidoc)
@@ -163,44 +203,18 @@ namespace Brand_25
             try
             {
                 Selection sel = uidoc.Selection;
-                IList<Reference> pickedRefs = sel.PickObjects(ObjectType.Element, new GridSelectionFilter(), "Select grids to modify bubble visibility");
-
-                List<Grid> grids = new List<Grid>();
-                Document doc = uidoc.Document;
-
-                foreach (Reference r in pickedRefs)
-                {
-                    Element elem = doc.GetElement(r);
-                    if (elem is Grid grid)
-                    {
-                        grids.Add(grid);
-                    }
-                }
-
-                return grids;
+                IList<Element> pickedElements = sel.PickElementsByRectangle(new GridSelectionFilter(), "Select grids to modify bubble visibility");
+                return pickedElements.OfType<Grid>().ToList();
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
             {
-                return null; // User canceled selection
+                return null;
             }
         }
 
         public class GridSelectionFilter : ISelectionFilter
         {
             public bool AllowElement(Element elem) => elem is Grid;
-            public bool AllowReference(Reference reference, XYZ position) => false;
-        }
-
-        public class LineSelectionFilter : ISelectionFilter
-        {
-            public bool AllowElement(Element elem)
-            {
-                if (elem is Grid) return true;
-                if (elem is CurveElement curveElement && curveElement.Category.Id.Value == (long)BuiltInCategory.OST_Lines)
-                    return true;
-                return false;
-            }
-
             public bool AllowReference(Reference reference, XYZ position) => false;
         }
     }

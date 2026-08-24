@@ -122,6 +122,12 @@ namespace Brand_25
             btnData6c.ToolTip = "Find TextNote Types with identical attributes and consolidate duplicates into a single type.";
             panel6.AddItem(btnData6c);
 
+            RibbonPanel panel7 = application.CreateRibbonPanel(tabName, "Sheets");
+            PushButtonData btnData7a = new PushButtonData("btn7a", "Align Plans\non Sheets", Assembly.GetExecutingAssembly().Location, "Brand_25.Plan_AlignOnSheets");
+            btnData7a.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData7a.ToolTip = "Align selected plan viewports on other sheets to the same setting-out as a chosen source plan (via Project Base Point). Views whose rotation differs from the source are skipped and logged.";
+            panel7.AddItem(btnData7a);
+
             //PushButtonData btnDataLineB = new PushButtonData("btnLineB", "Test filled region", Assembly.GetExecutingAssembly().Location, "Brand_25.Test_FilledRegionModifier");
             //btnDataLineB.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
             //btnDataLineB.ToolTip = "test";

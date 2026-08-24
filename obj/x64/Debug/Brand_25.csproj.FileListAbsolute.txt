@@ -87,3 +87,5 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Consolidate_LineStyle.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Consolidate_LineStyle.g.cs
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_LineStylePurge.baml
 C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_LineStylePurge.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_PlanAlign.g.cs
+C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\Selection_PlanAlign.baml
