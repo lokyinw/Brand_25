@@ -8,13 +8,13 @@ C:\Users\LokYinW\source\repos\Brand_25\obj\x64\Debug\
 Brand_25
 none
 false
-DEBUG;TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
+DEBUG;TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 
-20-910914665
+21-1359464797
 
-54238107355
+581976604912
 200-1870130870
-BulletPointSelector.xaml;Consolidate_LineStyle.xaml;Consolidate_TextNoteType.xaml;Input_LineWeight.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_DimDistance.xaml;Selection_DimStyle.xaml;Selection_ElevType.xaml;Selection_LineStylePurge.xaml;Selection_PhaseDO.xaml;Selection_PlanAlign.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_TagTypes.xaml;Selection_ViewPlan.xaml;Warning.xaml;WarningLarge.xaml;
+BulletPointSelector.xaml;Consolidate_LineStyle.xaml;Consolidate_TextNoteType.xaml;Input_LineWeight.xaml;Report_DupMaterialKeynote.xaml;Report_DupTextNoteType.xaml;Selection_CWType.xaml;Selection_DimDistance.xaml;Selection_DimStyle.xaml;Selection_ElementTree.xaml;Selection_ElevType.xaml;Selection_LineStylePurge.xaml;Selection_PhaseDO.xaml;Selection_PlanAlign.xaml;Selection_Room.xaml;Selection_Sheet.xaml;Selection_SheetLayout.xaml;Selection_TagTypes.xaml;Selection_ViewPlan.xaml;Warning.xaml;WarningLarge.xaml;
 
 False
 
