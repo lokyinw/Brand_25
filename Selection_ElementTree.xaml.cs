@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace Brand_25
 {
@@ -94,6 +95,15 @@ namespace Brand_25
 
         private VM_ElementTreeNode _root;
 
+        // Debounces the search box: filtering re-walks the whole tree, which for
+        // a large "Entire Project" scan could feel laggy if re-run on every single
+        // keystroke — this waits for a short pause in typing before actually
+        // applying the filter.
+        private readonly DispatcherTimer _searchDebounceTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+
         public Selection_ElementTree(Document doc, UIDocument uidoc,
             ElementTreeSelectionHandler selectionHandler, ExternalEvent selectionEvent,
             ElementTreeZoomHandler zoomHandler, ExternalEvent zoomEvent,
@@ -132,6 +142,12 @@ namespace Brand_25
             }
 
             _expandedPaths.Add("Categories"); // default: only the root starts expanded
+
+            _searchDebounceTimer.Tick += (s, e) =>
+            {
+                _searchDebounceTimer.Stop();
+                ApplySearch(SearchBox.Text);
+            };
 
             _isInitializing = true;
             SelectComboItemForScope(initialScope);
@@ -208,12 +224,9 @@ namespace Brand_25
                     if (!(_doc.GetElement(_scopeViewId) is View view) || !view.IsValidObject)
                         return new List<Element>(); // the tracked view was itself deleted
 
-                    ElementMulticategoryFilter viewFilter = GetModelCategoryFilter(_doc);
-                    if (viewFilter == null) return new List<Element>();
-
                     return new FilteredElementCollector(_doc, view.Id)
-                        .WherePasses(viewFilter)
                         .WhereElementIsNotElementType()
+                        .Where(IsIncludedModelElement)
                         .ToList();
 
                 case ElementTreeScope.CurrentSelection:
@@ -243,16 +256,32 @@ namespace Brand_25
             _root = BuildTree(elements);
             ElementTreeView.ItemsSource = new List<VM_ElementTreeNode> { _root };
             TitleText.Text = $"Select Elements — {elements.Count} instance(s) in {ScopeDisplayName(_currentScope)}, live";
+
+            // A tree rebuild discards every old node, which would otherwise
+            // silently drop whatever search filter was active — reapply it
+            // immediately against the fresh tree.
+            ApplySearch(SearchBox.Text);
         }
 
-        // Root ("Categories") -> Category -> Family -> Type -> Instance.
+        // Root ("Categories") -> Category -> Family -> Type -> Instance — EXCEPT
+        // for CAD imports/links (ImportInstance) and linked Revit models
+        // (RevitLinkInstance), where the Family level is skipped entirely:
+        // Category -> (one node per file) -> Instance. Both element kinds report
+        // a FamilyName that's generically identical across every file (e.g. every
+        // CAD import might report something like "Import Symbol" regardless of
+        // which DWG it is) — the distinction that actually matters (which file)
+        // already lives at the Type level (an ImportInstance's type is the
+        // CADLinkType, and a RevitLinkInstance's type is the RevitLinkType, both
+        // of whose Name is the imported/linked file's own name). Carrying the
+        // uninformative Family level for these would just be one more click to
+        // get through for no benefit.
         private VM_ElementTreeNode BuildTree(List<Element> elements)
         {
             const string rootPath = "Categories";
             VM_ElementTreeNode rootNode = CreateNode("Categories", ElementTreeLevel.Root, null, rootPath);
 
             var byCategory = elements
-                .GroupBy(SafeCategoryName)
+                .GroupBy(GetCategoryGroupName)
                 .OrderBy(g => g.Key);
 
             foreach (var categoryGroup in byCategory)
@@ -260,6 +289,26 @@ namespace Brand_25
                 string categoryPath = $"{rootPath}/{categoryGroup.Key}";
                 VM_ElementTreeNode categoryNode = CreateNode(categoryGroup.Key, ElementTreeLevel.Category, rootNode, categoryPath);
                 rootNode.Children.Add(categoryNode);
+
+                bool skipFamilyLevel = categoryGroup.All(e => e is ImportInstance || e is RevitLinkInstance);
+
+                if (skipFamilyLevel)
+                {
+                    var byFile = categoryGroup
+                        .GroupBy(GetTypeName)
+                        .OrderBy(g => g.Key);
+
+                    foreach (var fileGroup in byFile)
+                    {
+                        string filePath = $"{categoryPath}/{fileGroup.Key}";
+                        VM_ElementTreeNode fileNode = CreateNode(fileGroup.Key, ElementTreeLevel.Type, categoryNode, filePath);
+                        categoryNode.Children.Add(fileNode);
+
+                        AddInstanceNodes(fileGroup, fileNode, filePath);
+                    }
+
+                    continue;
+                }
 
                 var byFamily = categoryGroup
                     .GroupBy(GetFamilyName)
@@ -281,24 +330,7 @@ namespace Brand_25
                         VM_ElementTreeNode typeNode = CreateNode(typeGroup.Key, ElementTreeLevel.Type, familyNode, typePath);
                         familyNode.Children.Add(typeNode);
 
-                        foreach (Element elem in typeGroup.OrderBy(GetInstanceLabel))
-                        {
-                            string instancePath = $"{typePath}/id:{elem.Id.Value}";
-                            VM_ElementTreeNode instanceNode = CreateNode(
-                                GetInstanceLabel(elem), ElementTreeLevel.Instance, typeNode, instancePath, elem);
-
-                            // Seed from the persistent checked-id set, quietly (no
-                            // cascade/notify — nothing is subscribed to this node yet).
-                            instanceNode.SetInitialCheckedQuiet(_checkedIds.Contains(elem.Id));
-
-                            // From here on, any check/uncheck of THIS node (directly,
-                            // or via a Family/Type/Category ancestor cascading down
-                            // to it) updates _checkedIds and pushes the new
-                            // selection to Revit.
-                            instanceNode.PropertyChanged += InstanceNode_PropertyChanged;
-
-                            typeNode.Children.Add(instanceNode);
-                        }
+                        AddInstanceNodes(typeGroup, typeNode, typePath);
                     }
                 }
             }
@@ -308,6 +340,33 @@ namespace Brand_25
             // notifications that only fire in response to a live user click.
             rootNode.RefreshAggregateRecursive();
             return rootNode;
+        }
+
+        // Shared leaf-building step for both branches above — one Instance node
+        // per element, seeded from the persistent checked-id set, wired to push
+        // live selection updates, and tagged with the fields the search box
+        // matches against.
+        private void AddInstanceNodes(IEnumerable<Element> elems, VM_ElementTreeNode parentNode, string parentPath)
+        {
+            foreach (Element elem in elems.OrderBy(GetInstanceLabel))
+            {
+                string instancePath = $"{parentPath}/id:{elem.Id.Value}";
+                VM_ElementTreeNode instanceNode = CreateNode(
+                    GetInstanceLabel(elem), ElementTreeLevel.Instance, parentNode, instancePath, elem);
+
+                // Seed from the persistent checked-id set, quietly (no
+                // cascade/notify — nothing is subscribed to this node yet).
+                instanceNode.SetInitialCheckedQuiet(_checkedIds.Contains(elem.Id));
+
+                // From here on, any check/uncheck of THIS node (directly, or via
+                // an ancestor cascading down to it) updates _checkedIds and
+                // pushes the new selection to Revit.
+                instanceNode.PropertyChanged += InstanceNode_PropertyChanged;
+
+                instanceNode.SearchFields = BuildSearchFields(elem);
+
+                parentNode.Children.Add(instanceNode);
+            }
         }
 
         // Constructs a node, seeds its IsExpanded from the persisted path->expanded
@@ -332,38 +391,79 @@ namespace Brand_25
 
         // ── Element collection / grouping helpers ───────────────────────────
 
-        // Every category where CategoryType == Model — physical/spatial elements
-        // (Walls, Doors, Furniture, Rooms, ...) as opposed to annotations, tags,
-        // view-specific graphics, or internal/settings categories.
-        private static ElementMulticategoryFilter GetModelCategoryFilter(Document doc)
+        // Filters by the element's ACTUAL Category.CategoryType rather than
+        // building a closed BuiltInCategory allow-list (the previous approach,
+        // via ElementMulticategoryFilter) — that approach silently excluded
+        // anything whose Category reports BuiltInCategory.INVALID, which includes
+        // CAD import layers and other dynamically-created categories. Checking
+        // CategoryType directly per element catches those too, at the cost of a
+        // heavier upfront query on very large projects (this now has to look at
+        // every element in the relevant scope, not just a pre-filtered category
+        // set) — an accepted trade-off, and also what makes it straightforward to
+        // widen this later (e.g. to include Levels/Grids/Tags) by adjusting a
+        // single condition rather than restructuring how elements are collected.
+        // Categories excluded outright regardless of CategoryType — a mix of
+        // Settings/annotation-adjacent categories that still surfaced through the
+        // broad CategoryType.Model scan (Sheets, Project Information), Model
+        // categories no one would ever want to select/tag as a real element
+        // (Materials, Material Assets, Sun Path, Areas), and internal
+        // sketch/geometry placeholders (<Sketch>, <Stair/Ramp Sketch>, Railing
+        // Rail Path Extension Lines). Matched by display name (case-insensitive)
+        // rather than BuiltInCategory, mirroring Line_ConsolidateStyles.cs's own
+        // excluded-names list — the exact BuiltInCategory each of these resolves
+        // to isn't confirmed against the live API, whereas the displayed names
+        // are exactly what was specified.
+        private static readonly HashSet<string> ExcludedCategoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            List<BuiltInCategory> modelCategories = new List<BuiltInCategory>();
-            foreach (Category cat in doc.Settings.Categories)
-            {
-                try
-                {
-                    if (cat.CategoryType == CategoryType.Model && cat.BuiltInCategory != BuiltInCategory.INVALID)
-                        modelCategories.Add(cat.BuiltInCategory);
-                }
-                catch
-                {
-                    // Some categories can throw when queried this way (seen before
-                    // with certain line-style subcategories) — skip rather than
-                    // abort the whole scan over one bad category.
-                }
-            }
+            "Material",
+            "Materials",
+            "Material Assets",
+            "Sun Path",
+            "Sheets",
+            "Railing Rail Path Extension Lines",
+            "Project Information",
+            "Legend Components",
+            "Areas",
+            "<Sketch>",
+        };
 
-            return modelCategories.Count > 0 ? new ElementMulticategoryFilter(modelCategories) : null;
+        // Prefix-matched (case-insensitive) rather than exact — "<Stair/Ramp
+        // Sketch>" turned out not to be a single category at all, but four
+        // distinct sub-category names sharing one family: "<Stair/Ramp Sketch:
+        // Boundary>", ": Riser>", ": Run>", ": Stair Path>". An exact-match entry
+        // for the bare "<Stair/Ramp Sketch>" string never matched any of them.
+        private static readonly string[] ExcludedCategoryNamePrefixes =
+        {
+            "<Stair/Ramp Sketch",
+        };
+
+        private static bool IsIncludedModelElement(Element e)
+        {
+            try
+            {
+                if (e.Category == null || e.Category.CategoryType != CategoryType.Model) return false;
+
+                string name = e.Category.Name;
+                if (ExcludedCategoryNames.Contains(name)) return false;
+
+                foreach (string prefix in ExcludedCategoryNamePrefixes)
+                {
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static List<Element> CollectAllModelElements(Document doc)
         {
-            ElementMulticategoryFilter filter = GetModelCategoryFilter(doc);
-            if (filter == null) return new List<Element>();
-
             return new FilteredElementCollector(doc)
-                .WherePasses(filter)
                 .WhereElementIsNotElementType()
+                .Where(IsIncludedModelElement)
                 .ToList();
         }
 
@@ -371,6 +471,34 @@ namespace Brand_25
         {
             try { return elem.Category?.Name ?? "(no category)"; }
             catch { return "(no category)"; }
+        }
+
+        // Top-level grouping key. For everything except CAD imports/links this is
+        // just the element's real Revit Category (e.g. "Doors", "Floors"). CAD
+        // imports are the deliberate exception: Revit gives each imported file its
+        // OWN pseudo-category (literally named after the file), so grouping by
+        // real Category would put every different DWG at the same top level as
+        // Doors/Floors/etc. — exactly the clutter this collapses. Instead, EVERY
+        // ImportInstance is routed into one of two synthetic buckets based on
+        // IsLinked, regardless of which file or real category it actually has:
+        // "Linked CAD" for CAD links, "Imported CAD" for embedded CAD imports.
+        // The per-file distinction isn't lost — it still shows up one level down,
+        // at the Type level (see BuildTree's skipFamilyLevel branch).
+        private static string GetCategoryGroupName(Element elem)
+        {
+            if (elem is ImportInstance importInstance)
+            {
+                try
+                {
+                    return importInstance.IsLinked ? "Linked CAD" : "Imported CAD";
+                }
+                catch
+                {
+                    return "Imported CAD"; // conservative fallback if IsLinked itself throws
+                }
+            }
+
+            return SafeCategoryName(elem);
         }
 
         // Works uniformly across loadable families (Doors, Furniture, ...) AND
@@ -419,6 +547,196 @@ namespace Brand_25
             return string.IsNullOrWhiteSpace(mark)
                 ? $"Id {elem.Id.Value}"
                 : $"{mark} (Id {elem.Id.Value})";
+        }
+
+        private static string GetMarkValue(Element elem)
+        {
+            try
+            {
+                Parameter p = elem.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
+                return p != null && p.HasValue ? p.AsString() ?? "" : "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        // Tries the instance's own Keynote first, then falls back to the
+        // element's TYPE — for a lot of categories, Keynote is actually a
+        // type-level parameter (set once on the Type, shared by every instance
+        // of it) rather than an instance-level one, so checking only the
+        // instance was silently missing every match that came from a type's
+        // keynote rather than an instance override.
+        private string GetKeynoteValue(Element elem)
+        {
+            string instanceKeynote = TryGetKeynoteFromElement(elem);
+            if (!string.IsNullOrWhiteSpace(instanceKeynote)) return instanceKeynote;
+
+            try
+            {
+                ElementId typeId = elem.GetTypeId();
+                if (typeId != ElementId.InvalidElementId)
+                {
+                    Element type = _doc.GetElement(typeId);
+                    if (type != null)
+                    {
+                        string typeKeynote = TryGetKeynoteFromElement(type);
+                        if (!string.IsNullOrWhiteSpace(typeKeynote)) return typeKeynote;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through — no keynote found on the type either.
+            }
+
+            return "";
+        }
+
+        // Tries the standard Keynote built-in parameter first; falls back to a
+        // name lookup since not every category necessarily exposes it the same
+        // way (mirrors the defensive get_Parameter-then-LookupParameter pattern
+        // Mat_FindDupKeynote.cs already uses for material keynotes). Shared by
+        // GetKeynoteValue above for both the instance and (if needed) its type.
+        private static string TryGetKeynoteFromElement(Element e)
+        {
+            try
+            {
+                Parameter p = e.get_Parameter(BuiltInParameter.KEYNOTE_PARAM);
+                if (p != null && p.HasValue)
+                {
+                    string v = p.AsValueString() ?? p.AsString();
+                    if (!string.IsNullOrWhiteSpace(v)) return v;
+                }
+            }
+            catch
+            {
+                // BuiltInParameter.KEYNOTE_PARAM may not apply to this element —
+                // fall through to the named lookup below.
+            }
+
+            try
+            {
+                Parameter p = e.LookupParameter("Keynote");
+                if (p != null && p.HasValue)
+                {
+                    string v = p.AsValueString() ?? p.AsString();
+                    if (!string.IsNullOrWhiteSpace(v)) return v;
+                }
+            }
+            catch
+            {
+                // Give up quietly — no keynote here either, which is a valid outcome.
+            }
+
+            return "";
+        }
+
+        // The exact set of fields the search box matches against: Mark, Family
+        // name, Type name, Id, Keynote — kept as separate strings (rather than one
+        // concatenated blob) so a search can't spuriously match across the
+        // boundary between two unrelated fields.
+        private string[] BuildSearchFields(Element elem) => new[]
+        {
+            GetMarkValue(elem),
+            GetFamilyName(elem),
+            GetTypeName(elem),
+            elem.Id.Value.ToString(),
+            GetKeynoteValue(elem)
+        };
+
+        // ── Search (narrows the tree; does not re-query Revit) ──────────────
+
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        // Clearing search is a deliberate, final action (unlike a mid-typing
+        // keystroke), so apply it immediately rather than waiting out the
+        // debounce delay. Setting SearchBox.Text would also fire
+        // SearchBox_TextChanged on its own, but stopping the timer and calling
+        // ApplySearch directly here avoids a brief, pointless delay before the
+        // tree actually reverts to fully visible.
+        private void ClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            SearchBox.Text = "";
+            _searchDebounceTimer.Stop();
+            ApplySearch("");
+        }
+
+        private void ApplySearch(string query)
+        {
+            if (_root == null) return;
+
+            string trimmed = query?.Trim() ?? "";
+
+            // A 1-character query matches almost anything in any real dataset.
+            // "id" specifically turned out to coincidentally match a huge
+            // fraction of elements too — it's a common substring in perfectly
+            // ordinary family/type names ("Grid", "Slide", "Solid", "Wide", ...),
+            // not anything to do with the literal word "Id". Both defeat the
+            // purpose of narrowing the tree, so treat them the same as an empty
+            // query: no filter applied at all, rather than "matches everything".
+            if (trimmed.Length < 2 || trimmed.Equals("id", StringComparison.OrdinalIgnoreCase))
+                trimmed = "";
+
+            ApplySearchFilterRecursive(_root, trimmed);
+        }
+
+        // Returns true if this node (or, for a non-leaf, any descendant) matches
+        // the query, and sets MatchesSearch on every node in the subtree
+        // accordingly — that's what drives each row's Visibility in XAML
+        // (VM_ElementTreeNode.RowVisibility). An empty query means "no filter":
+        // everything becomes visible again.
+        //
+        // Non-leaf nodes whose subtree contains a match are also force-expanded
+        // (IsExpanded = true), since otherwise a match buried under a Family/Type
+        // that defaults to collapsed would be invisible despite "matching". This
+        // does persist into _expandedPaths the same way a manual expand would
+        // (see CreateNode), so a branch revealed by a search stays expanded even
+        // after the search is cleared — a deliberate, simple trade-off rather
+        // than tracking a second "temporarily forced open" state to unwind later.
+        private static bool ApplySearchFilterRecursive(VM_ElementTreeNode node, string query)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                node.MatchesSearch = true;
+                foreach (VM_ElementTreeNode child in node.Children)
+                    ApplySearchFilterRecursive(child, query);
+                return true;
+            }
+
+            if (node.Level == ElementTreeLevel.Instance)
+            {
+                bool isMatch = NodeMatchesSearch(node, query);
+                node.MatchesSearch = isMatch;
+                return isMatch;
+            }
+
+            bool anyChildMatches = false;
+            foreach (VM_ElementTreeNode child in node.Children)
+            {
+                if (ApplySearchFilterRecursive(child, query)) anyChildMatches = true;
+            }
+
+            node.MatchesSearch = anyChildMatches;
+            if (anyChildMatches) node.IsExpanded = true;
+
+            return anyChildMatches;
+        }
+
+        private static bool NodeMatchesSearch(VM_ElementTreeNode node, string query)
+        {
+            if (node.SearchFields == null) return false;
+            foreach (string field in node.SearchFields)
+            {
+                if (!string.IsNullOrEmpty(field) && field.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            return false;
         }
 
         // ── Live selection push (Dialog -> Revit) ───────────────────────────
@@ -540,6 +858,25 @@ namespace Brand_25
         // untouched, same principle as the live-rebuild paths above.
         private void SelectAll_Click(object sender, RoutedEventArgs e) => _root.SetAll(true);
         private void SelectNone_Click(object sender, RoutedEventArgs e) => _root.SetAll(false);
+
+        // Collapses every node except the root, returning to the same default
+        // landing view as a fresh tree build (Categories expanded, each Category
+        // itself collapsed). Setting IsExpanded here goes through each node's own
+        // property setter, which — via the subscription wired in CreateNode —
+        // updates _expandedPaths automatically, so this also correctly "forgets"
+        // whatever branches the user (or a search) had expanded.
+        private void CollapseAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_root == null) return;
+            CollapseAllRecursive(_root, isRoot: true);
+        }
+
+        private static void CollapseAllRecursive(VM_ElementTreeNode node, bool isRoot)
+        {
+            node.IsExpanded = isRoot;
+            foreach (VM_ElementTreeNode child in node.Children)
+                CollapseAllRecursive(child, isRoot: false);
+        }
 
         // ── Boilerplate (window chrome, embedded images) ────────────────────
 

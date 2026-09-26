@@ -58,6 +58,36 @@ namespace Brand_25
         // binding read, since the tree can now be large (every model category).
         public int InstanceCount { get; private set; }
 
+        // Instance-level only: the fields the search box matches against (Mark,
+        // Family name, Type name, Id, Keynote), computed once when the node is
+        // built (Selection_ElementTree.BuildSearchFields) rather than re-derived
+        // from Revit parameters on every keystroke.
+        public string[] SearchFields { get; set; }
+
+        // Whether this node currently passes the active search filter — true for
+        // every node when there's no search text. Bound (via RowVisibility, not
+        // directly) to each TreeViewItem's Visibility, so a non-matching row is
+        // fully removed from layout rather than merely dimmed.
+        private bool _matchesSearch = true;
+        public bool MatchesSearch
+        {
+            get => _matchesSearch;
+            set
+            {
+                if (_matchesSearch == value) return;
+                _matchesSearch = value;
+                OnPropertyChanged(nameof(MatchesSearch));
+                OnPropertyChanged(nameof(RowVisibility));
+            }
+        }
+
+        // Fully-qualified because Autodesk.Revit.DB (imported for Element/
+        // ElementId elsewhere in this class) also declares its own Visibility
+        // enum — the plain type name is ambiguous once both namespaces are in
+        // scope.
+        public System.Windows.Visibility RowVisibility =>
+            MatchesSearch ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
         private bool _isExpanded;
         public bool IsExpanded
         {

@@ -144,33 +144,66 @@ namespace Brand_25
             return Result.Succeeded;
         }
 
-        // Every category where CategoryType == Model — mirrors
-        // Selection_ElementTree.GetModelCategoryFilter/CollectAllModelElements
+        // Mirrors Selection_ElementTree.IsIncludedModelElement/CollectAllModelElements
         // exactly, duplicated here only because this check needs to run BEFORE
-        // the window (and therefore that helper) exists.
+        // the window (and therefore that helper) exists. Filters by the
+        // element's ACTUAL Category.CategoryType rather than a closed
+        // BuiltInCategory allow-list, so CAD import layers and other
+        // dynamically-created categories (which report BuiltInCategory.INVALID)
+        // are included too — then excludes a specific list of category names
+        // (see ExcludedCategoryNames) regardless of CategoryType.
         private static List<Element> CollectAllModelElements(Document doc)
         {
-            List<BuiltInCategory> modelCategories = new List<BuiltInCategory>();
-            foreach (Category cat in doc.Settings.Categories)
-            {
-                try
-                {
-                    if (cat.CategoryType == CategoryType.Model && cat.BuiltInCategory != BuiltInCategory.INVALID)
-                        modelCategories.Add(cat.BuiltInCategory);
-                }
-                catch
-                {
-                    // Skip a category that throws when queried, rather than abort.
-                }
-            }
-
-            if (modelCategories.Count == 0) return new List<Element>();
-
-            ElementMulticategoryFilter categoryFilter = new ElementMulticategoryFilter(modelCategories);
             return new FilteredElementCollector(doc)
-                .WherePasses(categoryFilter)
                 .WhereElementIsNotElementType()
+                .Where(IsIncludedModelElement)
                 .ToList();
+        }
+
+        // Kept identical to Selection_ElementTree.ExcludedCategoryNames — see
+        // that copy's comment for why these are matched by display name rather
+        // than BuiltInCategory.
+        private static readonly HashSet<string> ExcludedCategoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Material",
+            "Materials",
+            "Material Assets",
+            "Sun Path",
+            "Sheets",
+            "Railing Rail Path Extension Lines",
+            "Project Information",
+            "Legend Components",
+            "Areas",
+            "<Sketch>",
+        };
+
+        // Prefix-matched — see Selection_ElementTree.ExcludedCategoryNamePrefixes
+        // for why "<Stair/Ramp Sketch>" needs this instead of an exact match.
+        private static readonly string[] ExcludedCategoryNamePrefixes =
+        {
+            "<Stair/Ramp Sketch",
+        };
+
+        private static bool IsIncludedModelElement(Element e)
+        {
+            try
+            {
+                if (e.Category == null || e.Category.CategoryType != CategoryType.Model) return false;
+
+                string name = e.Category.Name;
+                if (ExcludedCategoryNames.Contains(name)) return false;
+
+                foreach (string prefix in ExcludedCategoryNamePrefixes)
+                {
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

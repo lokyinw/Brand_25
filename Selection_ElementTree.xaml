@@ -87,12 +87,14 @@
         <!-- Drives expand/collapse from VM_ElementTreeNode.IsExpanded, which the
              window seeds from a persisted path->expanded map on every rebuild
              (see Selection_ElementTree.CreateNode) so a manually expanded branch
-             survives a live rebuild instead of resetting to collapsed. Also turns
-             on recycling virtualization at every level of the hierarchy — with
-             every model category now in scope (not just Doors), the tree can get
-             considerably larger than before. -->
+             survives a live rebuild instead of resetting to collapsed. Also
+             drives per-row Visibility from RowVisibility (search filtering), and
+             turns on recycling virtualization at every level of the hierarchy —
+             with every model category now in scope (not just Doors), the tree
+             can get considerably larger than before. -->
         <Style TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <Setter Property="Visibility" Value="{Binding RowVisibility}"/>
             <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
             <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Recycling"/>
         </Style>
@@ -101,6 +103,7 @@
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="35"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="72"/>
@@ -147,25 +150,44 @@
             </ComboBox>
         </StackPanel>
 
+        <!-- Search — narrows the tree to Instance rows matching Mark, Family
+             name, Type name, Id, or Keynote (case-insensitive), plus their
+             ancestor path so a match is actually reachable. -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="10 0 10 4">
+            <TextBlock Text="Search:" Style="{StaticResource CustomFontStyle}" FontSize="14"
+                       Foreground="#272727" VerticalAlignment="Center" Margin="0 0 8 0"/>
+            <TextBox x:Name="SearchBox" Width="300" FontFamily="Calibri" FontSize="14"
+                     TextChanged="SearchBox_TextChanged"/>
+            <!-- Clears the search text. Doesn't need to touch scope or checked
+                 state at all — search only ever hides/shows already-built rows,
+                 it never re-queries Revit or alters _checkedIds, so clearing it
+                 naturally reveals everything the current "Show:" scope already
+                 produced, with every checkbox exactly as the user left it. -->
+            <Button x:Name="ClearSearchButton" Content="✕" Width="26" Height="24" Margin="4 0 0 0"
+                    FontFamily="Calibri" FontSize="13" ToolTip="Clear search"
+                    Click="ClearSearch_Click"/>
+        </StackPanel>
+
         <!-- Tree. SelectedItemChanged drives the zoom-to-element behavior — fires
              on a plain row click/highlight (TreeView's own row selection), fully
              independent of the checkbox. VirtualizingStackPanel here + on the
              TreeViewItem style above together give recycling virtualization
              through the whole hierarchy. -->
-        <TreeView x:Name="ElementTreeView" Grid.Row="2" Background="LightGray" BorderThickness="0" Margin="10 4 10 10"
+        <TreeView x:Name="ElementTreeView" Grid.Row="3" Background="LightGray" BorderThickness="0" Margin="10 4 10 10"
                   SelectedItemChanged="ElementTreeView_SelectedItemChanged"
                   VirtualizingStackPanel.IsVirtualizing="True"
                   VirtualizingStackPanel.VirtualizationMode="Recycling"/>
 
         <!-- Buttons — no OK/Cancel: every checkbox change already applies live to
              Revit's selection, so there's nothing left to "commit" at the end. -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10 0 0 10">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10 0 0 10">
             <Button Style="{StaticResource CustomButtonFontStyle}" Content="Close" Width="80" Margin="0 0 10 0" Click="buttonClose_Click"/>
             <Button Style="{StaticResource CustomButtonFontStyle}" Content="Select All" Width="100" Margin="0 0 10 0" Click="SelectAll_Click"/>
-            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Select None" Width="100" Click="SelectNone_Click"/>
+            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Select None" Width="100" Margin="0 0 10 0" Click="SelectNone_Click"/>
+            <Button Style="{StaticResource CustomButtonFontStyle}" Content="Collapse All" Width="110" Click="CollapseAll_Click"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Vertical" HorizontalAlignment="Right" Margin="0 0 10 10">
+        <StackPanel Grid.Row="4" Orientation="Vertical" HorizontalAlignment="Right" Margin="0 0 10 10">
             <Image x:Name="brandLogo" Width="150" Height="50" VerticalAlignment="Top" HorizontalAlignment="Right"/>
             <TextBlock x:Name="FooterText" Style="{StaticResource CustomFontStyle}" FontSize="12" Foreground="White"
                        HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
