@@ -49,7 +49,7 @@ namespace Brand_25
     [Transaction(TransactionMode.ReadOnly)]
     public class Element_SelectByTree : IExternalCommand
     {
-        private const string credit = "Last Modified by Lok on 2026-09-08. Beta 0.60 - generalized from Doors trial to all model categories";
+        private const string credit = "Last Modified by Lok on 2026-09-08. Beta 0.60";
 
         private static Selection_ElementTree _openWindow;
 

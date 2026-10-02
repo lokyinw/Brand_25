@@ -134,18 +134,16 @@ namespace Brand_25
             //panelTest.AddItem(btnDataLineB);
 
             RibbonPanel panel8 = application.CreateRibbonPanel(tabName, "Tests");
-            //PushButtonData btnDoorTreeData = new PushButtonData("btnDoorTree", "Select Doors\nby Tree", Assembly.GetExecutingAssembly().Location, "Brand_25.Door_SelectByTree");
-            //btnDoorTreeData.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
-            //btnDoorTreeData.ToolTip = "Browse every door as Category > Family > Type > Instance, check any combination, and set it as the current Revit selection.";
-            
-
-            //RibbonPanel panelElements = application.CreateRibbonPanel(tabName, "Elements");
             PushButtonData btnElementTreeData = new PushButtonData("btnElementTree", "Select Elements\nby Tree", Assembly.GetExecutingAssembly().Location, "Brand_25.Element_SelectByTree");
             btnElementTreeData.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png");
             btnElementTreeData.ToolTip = "Browse every model element as Category > Family > Type > Instance, check any combination, and set it as the current Revit selection.";
-            //panelElements.AddItem(btnElementTreeData);
             panel8.AddItem(btnElementTreeData);
 
+            RibbonPanel panelLuna = application.CreateRibbonPanel(tabName, "Luna");
+            PushButtonData btnData3e = new PushButtonData("btn3e", "Create\nFloor Finish", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_CreateFloorFinish");
+            btnData3e.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnData3e.ToolTip = "Create floor finishes from selected rooms (outline at wall finish), bottom aligned to the level plus an optional offset.";
+            panelLuna.AddItem(btnData3e);
 
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
