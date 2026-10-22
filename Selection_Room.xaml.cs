@@ -17,7 +17,37 @@ namespace Brand_25
         private string _credit;
         public List<Room> SelectedRooms { get; private set; }
 
+        // Original behaviour: pre-select rooms of the current phase that sit in the single
+        // active design option (or the main model when none is active). Still used by
+        // Room_CreateIntElev.
         public Selection_Room(List<Room> rooms, Phase currentPhase, DesignOption currentDesignOption, string credit = "Selection_Room Default")
+            : this(rooms, credit, viewModel =>
+                IsInPhase(viewModel, currentPhase) &&
+                viewModel.DesignOptionName == (currentDesignOption?.Name ?? "Main Model"))
+        {
+        }
+
+        // Pre-select rooms of the current phase that sit in the main model OR in any of the
+        // design options the view shows (visibleDesignOptionIds can span several option sets).
+        // Matched by element id rather than by name, because option names can repeat across sets.
+        public Selection_Room(List<Room> rooms, Phase currentPhase, ISet<ElementId> visibleDesignOptionIds, string credit = "Selection_Room Default")
+            : this(rooms, credit, viewModel =>
+            {
+                if (!IsInPhase(viewModel, currentPhase)) return false;
+                DesignOption roomOption = viewModel.Room.DesignOption;   // null = main model
+                return roomOption == null ||
+                       (visibleDesignOptionIds != null && visibleDesignOptionIds.Contains(roomOption.Id));
+            })
+        {
+        }
+
+        private static bool IsInPhase(VM_Room viewModel, Phase currentPhase)
+        {
+            return viewModel.PhaseName != null && currentPhase != null &&
+                   viewModel.PhaseName == currentPhase.Name;
+        }
+
+        private Selection_Room(List<Room> rooms, string credit, Func<VM_Room, bool> shouldPreselect)
         {
             _credit = credit;
             InitializeComponent();
@@ -29,10 +59,7 @@ namespace Brand_25
 
             foreach (VM_Room viewModel in roomViewModels)
             {
-                if (!viewModel.ShouldBeGrayedOut &&
-                    viewModel.PhaseName != null && currentPhase != null &&
-                    viewModel.PhaseName == currentPhase.Name &&
-                    viewModel.DesignOptionName == (currentDesignOption?.Name ?? "Main Model"))
+                if (!viewModel.ShouldBeGrayedOut && shouldPreselect(viewModel))
                 {
                     viewModel.IsSelected = true;
                 }

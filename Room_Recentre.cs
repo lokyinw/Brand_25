@@ -15,7 +15,7 @@ namespace Brand_25
         {
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
-            string credit = "Last Modified by Lok on 2025-03-30. Nightly 0.91";
+            string credit = "Last Modified by Lok on 2026-10-22. Nightly 0.92";
 
             try
             {
@@ -53,18 +53,28 @@ namespace Brand_25
                         .FirstOrDefault();
                 }
 
-                // Get the active design option ID using the static method
-                ElementId activeDesignOptionId = DesignOption.GetActiveDesignOptionId(doc);
-                DesignOption currentDesignOption = null;
-
-                // Retrieve the active design option if the ID is valid
-                if (activeDesignOptionId != ElementId.InvalidElementId)
+                // Only rooms of the active phase are offered in the dialog, so rooms of other
+                // phases cannot be selected. Matched on the room's phase (ROOM_PHASE, not
+                // CreatedPhaseId) by element id.
+                if (activePhase != null)
                 {
-                    currentDesignOption = doc.GetElement(activeDesignOptionId) as DesignOption;
+                    rooms = rooms
+                        .Where(r => r.get_Parameter(BuiltInParameter.ROOM_PHASE)?.AsElementId() == activePhase.Id)
+                        .ToList();
+
+                    if (rooms.Count == 0)
+                    {
+                        new Warning("Oops...", $"No rooms found in phase '{activePhase.Name}'.", credit).ShowDialog();
+                        return Result.Cancelled;
+                    }
                 }
 
+                // Design options the current view shows (across all option sets). Rooms in the
+                // main model are always pre-selected in addition to these.
+                HashSet<ElementId> visibleDesignOptionIds = GetVisibleDesignOptionIds(doc, activeView);
+
                 // Show the room selection window
-                Selection_Room roomSelectionWindow = new Selection_Room(rooms, activePhase, currentDesignOption, credit);
+                Selection_Room roomSelectionWindow = new Selection_Room(rooms, activePhase, visibleDesignOptionIds, credit);
                 bool? result = roomSelectionWindow.ShowDialog();
 
                 if (result != true || roomSelectionWindow.SelectedRooms == null || roomSelectionWindow.SelectedRooms.Count == 0)
@@ -139,6 +149,86 @@ namespace Brand_25
                 TaskDialog.Show("Error", $"An error occurred: {ex.Message}");
                 return Result.Failed;
             }
+        }
+
+        // Works out which design options the given view shows, across every option set.
+        // The main model is not included: it is always visible, and rooms without a design
+        // option are treated as main-model rooms by the caller.
+        //
+        // The Revit API cannot read a view's Visibility/Graphics > Design Options setting
+        // (neither "Automatic" nor an explicit per-set choice), so two steps are used:
+        //
+        // 1. Probe: an option counts as visible when the view-scoped collector returns at
+        //    least one element belonging to it. This reflects whatever the view is really
+        //    set to (Automatic or an explicit override). Limit: an option whose elements
+        //    are all outside this view (e.g. on another level) leaves no evidence.
+        //
+        // 2. Automatic fallback, per option set that showed no evidence in step 1:
+        //    - if the active option belongs to the set, that option is visible;
+        //    - otherwise (no active option in the set), the set's primary option is visible.
+        private static HashSet<ElementId> GetVisibleDesignOptionIds(Document doc, View view)
+        {
+            HashSet<ElementId> visible = new HashSet<ElementId>();
+
+            List<DesignOption> options = new FilteredElementCollector(doc)
+                .OfClass(typeof(DesignOption))
+                .Cast<DesignOption>()
+                .ToList();
+            if (options.Count == 0) return visible;   // no design options in the project
+
+            // Step 1: probe the view
+            foreach (DesignOption option in options)
+            {
+                try
+                {
+                    int count = new FilteredElementCollector(doc, view.Id)
+                        .WhereElementIsNotElementType()
+                        .WherePasses(new ElementDesignOptionFilter(option.Id))
+                        .GetElementCount();
+                    if (count > 0) visible.Add(option.Id);
+                }
+                catch (Exception)
+                {
+                    // Views that cannot be scoped by a collector (e.g. schedules) throw:
+                    // leave the option unproven and let the Automatic fallback decide.
+                }
+            }
+
+            // Step 2: Automatic fallback for every option set with no evidence
+            ElementId activeId = DesignOption.GetActiveDesignOptionId(doc);   // InvalidElementId = main model
+
+            foreach (IGrouping<ElementId, DesignOption> optionSet in options.GroupBy(GetOptionSetId))
+            {
+                if (optionSet.Any(o => visible.Contains(o.Id))) continue;
+
+                DesignOption activeInSet = optionSet.FirstOrDefault(o => o.Id == activeId);
+                if (activeInSet != null)
+                {
+                    visible.Add(activeInSet.Id);
+                }
+                else
+                {
+                    foreach (DesignOption primary in optionSet.Where(o => o.IsPrimary))
+                        visible.Add(primary.Id);
+                }
+            }
+
+            return visible;
+        }
+
+        // The option set an option belongs to, read through the "Option Set Id" built-in
+        // parameter. The enum member is looked up by name so a Revit version without it
+        // still compiles; in that case every option falls into one group (InvalidElementId)
+        // and the Automatic fallback treats all options as a single set.
+        private static ElementId GetOptionSetId(DesignOption option)
+        {
+            if (Enum.TryParse<BuiltInParameter>("OPTION_SET_ID", out BuiltInParameter bip))
+            {
+                Parameter p = option.get_Parameter(bip);
+                if (p != null && p.StorageType == StorageType.ElementId)
+                    return p.AsElementId();
+            }
+            return ElementId.InvalidElementId;
         }
 
         // Helper method to compare only the X and Y coordinates of two points
