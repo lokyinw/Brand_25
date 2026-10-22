@@ -14,18 +14,77 @@ namespace Brand_25
     [Regeneration(RegenerationOption.Manual)]
     public class Room_CreateIntElev : IExternalCommand
     {
+        // Elevations take their room boundaries from the ACTIVE design option, so the active
+        // option must be the one the plan view shows. Returns null when it is fine to go on,
+        // otherwise the message to show the user.
+        //
+        // Fine when:
+        //  - the project has no design options, or
+        //  - an option is active and the view shows it, or
+        //  - the Main Model is active and the view shows only primary options.
+        private static string CheckActiveDesignOption(Document doc, HashSet<ElementId> visibleOptionIds)
+        {
+            bool hasOptions = new FilteredElementCollector(doc)
+                .OfClass(typeof(DesignOption))
+                .GetElementCount() > 0;
+            if (!hasOptions) return null;
+
+            ElementId activeId = DesignOption.GetActiveDesignOptionId(doc);   // InvalidElementId = Main Model
+
+            List<DesignOption> shownOptions = visibleOptionIds
+                .Select(id => doc.GetElement(id) as DesignOption)
+                .Where(o => o != null)
+                .ToList();
+
+            string shownNames = shownOptions.Count == 0
+                ? "the Main Model"
+                : string.Join(", ", shownOptions.Select(o => $"'{o.Name}'"));
+
+            const string advice =
+                "\nElevations take their room boundaries from the active design option.\n" +
+                "Please set the active design option to the one you need, then run this command again.";
+
+            if (activeId == ElementId.InvalidElementId)
+            {
+                // Main Model active: only the primary option(s) are acceptable in the view.
+                List<DesignOption> nonPrimary = shownOptions.Where(o => !o.IsPrimary).ToList();
+                if (nonPrimary.Count == 0) return null;
+
+                return $"This view shows design option {string.Join(", ", nonPrimary.Select(o => $"'{o.Name}'"))}, " +
+                       "but the active design option is the Main Model." + advice;
+            }
+
+            if (visibleOptionIds.Contains(activeId)) return null;
+
+            DesignOption active = doc.GetElement(activeId) as DesignOption;
+            return $"This view shows {shownNames}, but the active design option is '{active?.Name}'." + advice;
+        }
+
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-07-22. Beta 0.71";
+            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.74";
 
             // Create a StringBuilder to log details
             StringBuilder log = new StringBuilder();
 
             try
             {
+                // Step 0: The active design option must be the one the plan view shows,
+                // otherwise the room boundaries (and so the elevations) would follow an
+                // option the user is not looking at. Stop before asking anything.
+                View activeView = doc.ActiveView;
+                HashSet<ElementId> visibleDesignOptionIds = Room_Recentre.GetVisibleDesignOptionIds(doc, activeView);
+
+                string designOptionProblem = CheckActiveDesignOption(doc, visibleDesignOptionIds);
+                if (designOptionProblem != null)
+                {
+                    new WarningLarge("Active Design Option", designOptionProblem, credit).ShowDialog();
+                    return Result.Cancelled;
+                }
+
                 // Step 1: Collect all elevation view family types
                 List<ViewFamilyType> elevViewTypes = new FilteredElementCollector(doc)
                     .OfClass(typeof(ViewFamilyType))
@@ -61,17 +120,7 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                // Step 4: Get the active design option
-                ElementId activeDesignOptionId = DesignOption.GetActiveDesignOptionId(doc);
-                DesignOption currentDesignOption = null;
-
-                if (activeDesignOptionId != ElementId.InvalidElementId)
-                {
-                    currentDesignOption = doc.GetElement(activeDesignOptionId) as DesignOption;
-                }
-
-                // Step 5: Show the room selection window
-                View activeView = doc.ActiveView;
+                // Step 4: Work out the active view's phase
                 Phase activePhase = null;
 
                 Parameter phaseParam = activeView.get_Parameter(BuiltInParameter.VIEW_PHASE);
@@ -91,7 +140,29 @@ namespace Brand_25
                         .FirstOrDefault();
                 }
 
-                Selection_Room roomWindow = new Selection_Room(rooms, activePhase, currentDesignOption, credit);
+                // Step 5: Only rooms of the active phase AND of the main model / a design option
+                // the view shows (worked out in Step 0, across all option sets) are offered in
+                // the dialog, so nothing else can be selected. Same logic as Room_Recentre. The
+                // phase is matched on the room's own phase (ROOM_PHASE, not CreatedPhaseId) by
+                // element id.
+                rooms = rooms
+                    .Where(r =>
+                        (activePhase == null ||
+                         r.get_Parameter(BuiltInParameter.ROOM_PHASE)?.AsElementId() == activePhase.Id) &&
+                        (r.DesignOption == null || visibleDesignOptionIds.Contains(r.DesignOption.Id)))
+                    .ToList();
+
+                if (rooms.Count == 0)
+                {
+                    string scope = activePhase != null
+                        ? $"in phase '{activePhase.Name}' and the design options shown in this view"
+                        : "in the design options shown in this view";
+                    new Warning("Oops...", $"No rooms found {scope}.", credit).ShowDialog();
+                    return Result.Cancelled;
+                }
+
+                // Show the room selection window
+                Selection_Room roomWindow = new Selection_Room(rooms, activePhase, visibleDesignOptionIds, credit);
                 if (roomWindow.ShowDialog() != true || roomWindow.SelectedRooms == null || !roomWindow.SelectedRooms.Any())
                 {
                     return Result.Cancelled;

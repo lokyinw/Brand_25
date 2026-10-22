@@ -15,7 +15,7 @@ namespace Brand_25
         {
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
-            string credit = "Last Modified by Lok on 2026-10-22. Nightly 0.92";
+            string credit = "Last Modified by Lok on 2026-10-22. Nightly 0.93";
 
             try
             {
@@ -53,25 +53,28 @@ namespace Brand_25
                         .FirstOrDefault();
                 }
 
-                // Only rooms of the active phase are offered in the dialog, so rooms of other
-                // phases cannot be selected. Matched on the room's phase (ROOM_PHASE, not
-                // CreatedPhaseId) by element id.
-                if (activePhase != null)
-                {
-                    rooms = rooms
-                        .Where(r => r.get_Parameter(BuiltInParameter.ROOM_PHASE)?.AsElementId() == activePhase.Id)
-                        .ToList();
-
-                    if (rooms.Count == 0)
-                    {
-                        new Warning("Oops...", $"No rooms found in phase '{activePhase.Name}'.", credit).ShowDialog();
-                        return Result.Cancelled;
-                    }
-                }
-
-                // Design options the current view shows (across all option sets). Rooms in the
-                // main model are always pre-selected in addition to these.
+                // Design options the current view shows (across all option sets). Main-model
+                // rooms are always included in addition to these.
                 HashSet<ElementId> visibleDesignOptionIds = GetVisibleDesignOptionIds(doc, activeView);
+
+                // Only rooms of the active phase AND of the main model / a design option the view
+                // shows are offered in the dialog, so nothing else can be selected. The phase is
+                // matched on the room's own phase (ROOM_PHASE, not CreatedPhaseId) by element id.
+                rooms = rooms
+                    .Where(r =>
+                        (activePhase == null ||
+                         r.get_Parameter(BuiltInParameter.ROOM_PHASE)?.AsElementId() == activePhase.Id) &&
+                        (r.DesignOption == null || visibleDesignOptionIds.Contains(r.DesignOption.Id)))
+                    .ToList();
+
+                if (rooms.Count == 0)
+                {
+                    string scope = activePhase != null
+                        ? $"in phase '{activePhase.Name}' and the design options shown in this view"
+                        : "in the design options shown in this view";
+                    new Warning("Oops...", $"No rooms found {scope}.", credit).ShowDialog();
+                    return Result.Cancelled;
+                }
 
                 // Show the room selection window
                 Selection_Room roomSelectionWindow = new Selection_Room(rooms, activePhase, visibleDesignOptionIds, credit);
@@ -166,7 +169,8 @@ namespace Brand_25
         // 2. Automatic fallback, per option set that showed no evidence in step 1:
         //    - if the active option belongs to the set, that option is visible;
         //    - otherwise (no active option in the set), the set's primary option is visible.
-        private static HashSet<ElementId> GetVisibleDesignOptionIds(Document doc, View view)
+        // internal (not private) because Room_CreateIntElev uses the same pre-selection logic.
+        internal static HashSet<ElementId> GetVisibleDesignOptionIds(Document doc, View view)
         {
             HashSet<ElementId> visible = new HashSet<ElementId>();
 

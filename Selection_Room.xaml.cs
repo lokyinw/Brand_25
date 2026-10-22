@@ -52,7 +52,7 @@ namespace Brand_25
             _credit = credit;
             InitializeComponent();
 
-            TitleText.Text = "Select Rooms to Re-center the Room Tag";
+            TitleText.Text = "Select Rooms";
             FooterText.Text = credit;
 
             List<VM_Room> roomViewModels = rooms.Select(room => new VM_Room(room)).ToList();
