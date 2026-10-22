@@ -10,8 +10,6 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <local:InverseBoolConverter x:Key="InverseBoolConverter"/>
-
         <Style x:Key="TitleBarButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -56,8 +54,6 @@
             <Setter Property="Height" Value="28"/>
         </Style>
 
-        <!-- Sheet header row in the target tree — not selectable, bold, matches the
-             app's dark accent so it reads clearly as a grouping row, not a plan item. -->
         <Style x:Key="TreeSheetHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource CustomFontStyle}">
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -70,10 +66,13 @@
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="Foreground" Value="#272727"/>
             <Setter Property="Margin" Value="0 2 0 2"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#9A9A9A"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- Implicit style — expands every TreeViewItem (sheet header rows) by default,
-             so the user sees every plan without having to manually expand each sheet. -->
         <Style TargetType="{x:Type TreeViewItem}">
             <Setter Property="IsExpanded" Value="True"/>
         </Style>
@@ -85,7 +84,9 @@
                     <CheckBox Content="{Binding DisplayLabel}"
                               Style="{StaticResource TreePlanCheckBoxStyle}"
                               IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              IsEnabled="{Binding IsSourceExcluded, Converter={StaticResource InverseBoolConverter}}"/>
+                              IsEnabled="{Binding CanSelect}"
+                              ToolTip="{Binding IncompatibleReason}"
+                              ToolTipService.ShowOnDisabled="True"/>
                 </DataTemplate>
             </HierarchicalDataTemplate.ItemTemplate>
         </HierarchicalDataTemplate>
@@ -131,7 +132,7 @@
 
         <!-- Source plan -->
         <StackPanel Grid.Row="1" Margin="15 12 15 4">
-            <TextBlock Text="Align plans to the setting-out of:" Style="{StaticResource LabelStyle}"/>
+            <TextBlock x:Name="SourceLabel" Style="{StaticResource LabelStyle}"/>
             <ComboBox x:Name="SourceCombo" Style="{StaticResource CustomComboBoxStyle}"/>
         </StackPanel>
 

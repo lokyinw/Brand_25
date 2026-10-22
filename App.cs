@@ -140,10 +140,15 @@ namespace Brand_25
             panel8.AddItem(btnElementTreeData);
 
             RibbonPanel panelLuna = application.CreateRibbonPanel(tabName, "Luna");
-            PushButtonData btnData3e = new PushButtonData("btn3e", "Create\nFloor Finish", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_CreateFloorFinish");
-            btnData3e.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
-            btnData3e.ToolTip = "Create floor finishes from selected rooms (outline at wall finish), bottom aligned to the level plus an optional offset.";
-            panelLuna.AddItem(btnData3e);
+            PushButtonData btnDatal1 = new PushButtonData("btnl1", "Create\nFloor Finish", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_CreateFloorFinish");
+            btnDatal1.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnDatal1.ToolTip = "Create floor finishes from selected rooms (outline at wall finish), bottom aligned to the level plus an optional offset.";
+            panelLuna.AddItem(btnDatal1);
+            PushButtonData btnDatal2 = new PushButtonData("btnl2", "Mass\nFrom Excel", Assembly.GetExecutingAssembly().Location, "Brand_25.Luna_CreateMassFromExcel");
+            btnDatal2.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnDatal2.ToolTip = "Create Mass families from Excel Area Schedule.";
+            panelLuna.AddItem(btnDatal2);
+
 
 
             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");

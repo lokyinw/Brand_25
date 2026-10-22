@@ -1,13 +1,12 @@
 ﻿using Autodesk.Revit.DB;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 
 namespace Brand_25
 {
-    // Wraps a single plan Viewport (FloorPlan / CeilingPlan / AreaPlan / StructuralPlan)
-    // placed on a sheet, for display in both Selection_PlanAlign's source combo box
-    // (as a flattened "Sheet : View" entry) and its target tree (grouped under a
-    // VM_PlanSheetGroup node). Kept separate from VM_Sheet since that VM represents a
-    // whole sheet with no notion of "which viewport", which this command needs.
+    // A plan viewport placed on a sheet, shown in Selection_PlanAlign's source combo
+    // and (under a VM_PlanSheetGroup) in its target tree.
     public class VM_PlanViewport : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
@@ -21,15 +20,17 @@ namespace Brand_25
         public string SheetNumber => Sheet.SheetNumber;
         public string SheetName => Sheet.Name;
         public string ViewName => PlanView.Name;
+        public int Scale => PlanView.Scale;
 
-        // Display label used by both the source ComboBox and the tree's child rows.
-        public string DisplayLabel => $"{ViewName}";
+        public string DisplayLabel => ViewName;
         public string ComboLabel => $"{SheetNumber} - {SheetName} : {ViewName}";
 
-        // Paper-space area (view.Scale-normalized crop width x height), used only to
-        // pick the "largest plan on this sheet" default for the source combo — never
-        // shown to the user.
+        // Paper-space crop area; only used to order the plans on a sheet largest-first.
         public double PaperAreaSqFt { get; }
+
+        // Sheet-space direction of model +X, set by the command; used for the rotation
+        // comparison. Null when the plan could not be measured.
+        public XYZ RotationDirection { get; set; }
 
         private bool _isSelected;
         public bool IsSelected
@@ -43,10 +44,7 @@ namespace Brand_25
             }
         }
 
-        // True when this viewport is currently chosen as the source plan in the
-        // dialog's combo box — disables (and clears) its checkbox in the target tree,
-        // since a plan can't be aligned to itself. Updated by the dialog's code-behind
-        // whenever the source combo selection changes.
+        // True while this viewport is the chosen source — a plan can't be aligned to itself.
         private bool _isSourceExcluded;
         public bool IsSourceExcluded
         {
@@ -57,8 +55,27 @@ namespace Brand_25
                 _isSourceExcluded = value;
                 if (_isSourceExcluded) IsSelected = false;
                 OnPropertyChanged(nameof(IsSourceExcluded));
+                OnPropertyChanged(nameof(CanSelect));
             }
         }
+
+        // Why this plan can't be aligned to the current source (different scale or
+        // rotation); null when it can.
+        private string _incompatibleReason;
+        public string IncompatibleReason
+        {
+            get => _incompatibleReason;
+            set
+            {
+                if (_incompatibleReason == value) return;
+                _incompatibleReason = value;
+                if (!string.IsNullOrEmpty(_incompatibleReason)) IsSelected = false;
+                OnPropertyChanged(nameof(IncompatibleReason));
+                OnPropertyChanged(nameof(CanSelect));
+            }
+        }
+
+        public bool CanSelect => !IsSourceExcluded && string.IsNullOrEmpty(IncompatibleReason);
 
         public VM_PlanViewport(ViewSheet sheet, Viewport viewport, View planView)
         {
@@ -68,21 +85,32 @@ namespace Brand_25
 
             BoundingBoxXYZ cropBox = planView.CropBox;
             double scale = planView.Scale <= 0 ? 1 : planView.Scale;
-            double widthFt = (cropBox.Max.X - cropBox.Min.X) / scale;
-            double heightFt = (cropBox.Max.Y - cropBox.Min.Y) / scale;
-            PaperAreaSqFt = widthFt * heightFt;
+            PaperAreaSqFt = (cropBox.Max.X - cropBox.Min.X) / scale * ((cropBox.Max.Y - cropBox.Min.Y) / scale);
+        }
+
+        // Returns the reason this plan can't be aligned to the given source, or null if it can.
+        public string GetIncompatibility(VM_PlanViewport source)
+        {
+            if (Scale != source.Scale)
+                return $"Scale 1:{Scale} differs from the source (1:{source.Scale})";
+            if (source.RotationDirection == null)
+                return "The source plan's orientation could not be measured";
+            if (RotationDirection == null)
+                return "This plan's orientation could not be measured";
+            if (Math.Abs(source.RotationDirection.DotProduct(RotationDirection)) < Plan_AlignOnSheets.RotationAlignedDotThreshold)
+                return "Rotation differs from the source";
+            return null;
         }
     }
 
-    // Groups a sheet's plan viewports together for the target TreeView. The sheet
-    // header row itself is not selectable — only its VM_PlanViewport children are.
+    // Groups a sheet's plan viewports under a non-selectable header row in the target tree.
     public class VM_PlanSheetGroup
     {
         public ViewSheet Sheet { get; }
         public string HeaderText => $"{Sheet.SheetNumber} - {Sheet.Name}";
-        public System.Collections.Generic.List<VM_PlanViewport> Plans { get; }
+        public List<VM_PlanViewport> Plans { get; }
 
-        public VM_PlanSheetGroup(ViewSheet sheet, System.Collections.Generic.List<VM_PlanViewport> plans)
+        public VM_PlanSheetGroup(ViewSheet sheet, List<VM_PlanViewport> plans)
         {
             Sheet = sheet;
             Plans = plans;

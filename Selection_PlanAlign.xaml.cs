@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Brand_25
@@ -19,12 +21,11 @@ namespace Brand_25
         public VM_PlanViewport SelectedSource { get; private set; }
         public List<VM_PlanViewport> SelectedTargets { get; private set; } = new List<VM_PlanViewport>();
 
-        // allPlans: every qualifying plan viewport in the project (one VM_PlanViewport
-        // per placed plan viewport, regardless of how many sit on the same sheet).
-        // preSelectSource: the (sheet, view)-largest VM_PlanViewport to pre-select in
-        // the source combo, or null if the active view isn't a qualifying sheet.
+        // allPlans: every plan viewport in the project. preSelectSource: the plan to
+        // pre-select as source (null for none). activeViewIsSheet: false adds a red
+        // warning before the source label.
         public Selection_PlanAlign(List<VM_PlanViewport> allPlans, VM_PlanViewport preSelectSource,
-                                    string credit = "Selection_PlanAlign Default")
+                                    string credit = "Selection_PlanAlign Default", bool activeViewIsSheet = true)
         {
             _credit = credit;
             _allPlans = allPlans;
@@ -40,27 +41,20 @@ namespace Brand_25
             brandLogo.Source = LoadEmbeddedImage("Brand_logo.png");
             icon.Source = LoadEmbeddedImage("B_icon_32.png");
 
-            // Source combo: one entry per sheet, showing only that sheet's LARGEST
-            // (paper-space) plan viewport — matches the spec's "if more than one plan
-            // on a sheet, pre-select the largest one" rule, applied here to which entry
-            // represents that sheet in the combo at all (there's only one entry per
-            // sheet either way, so "which one" and "which one is pre-selected for that
-            // sheet" are the same choice).
-            List<VM_PlanViewport> largestPerSheet = _allPlans
-                .GroupBy(p => p.Sheet.Id)
-                .Select(g => g.OrderByDescending(p => p.PaperAreaSqFt).First())
-                .OrderBy(p => p.SheetNumber, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            SourceLabel.Inlines.Clear();
+            if (!activeViewIsSheet)
+                SourceLabel.Inlines.Add(new Run("CURRENT VIEW IS NOT A SHEET. ") { Foreground = Brushes.Red, FontWeight = FontWeights.Bold });
+            SourceLabel.Inlines.Add(new Run("Align plans to the setting-out of:"));
 
-            SourceCombo.ItemsSource = largestPerSheet;
+            // Every plan is a possible source (e.g. a key plan), largest first within each sheet.
+            SourceCombo.ItemsSource = _allPlans
+                .OrderBy(p => p.SheetNumber, StringComparer.OrdinalIgnoreCase)
+                .ThenByDescending(p => p.PaperAreaSqFt)
+                .ToList();
             SourceCombo.DisplayMemberPath = "ComboLabel";
-            SourceCombo.SelectedItem = preSelectSource != null
-                ? largestPerSheet.FirstOrDefault(p => p.Sheet.Id == preSelectSource.Sheet.Id)
-                : null;
+            SourceCombo.SelectedItem = preSelectSource;
             SourceCombo.SelectionChanged += SourceCombo_SelectionChanged;
 
-            // Target tree: EVERY plan viewport, grouped by sheet — the full picture,
-            // not just each sheet's largest plan (unlike the source combo above).
             _sheetGroups = _allPlans
                 .GroupBy(p => p.Sheet.Id)
                 .Select(g => new VM_PlanSheetGroup(
@@ -71,29 +65,31 @@ namespace Brand_25
 
             TargetTree.ItemsSource = _sheetGroups;
 
-            UpdateSourceExclusion();
+            UpdateAvailability();
         }
 
         private void SourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateSourceExclusion();
+            UpdateAvailability();
         }
 
-        // Disables (and clears) the checkbox for whichever viewport is currently
-        // selected as the source — a plan can't be aligned to itself.
-        private void UpdateSourceExclusion()
+        // Greys out (and unticks) the source itself and every plan whose scale or
+        // rotation differs from the source; re-run whenever the source changes.
+        private void UpdateAvailability()
         {
             VM_PlanViewport source = SourceCombo.SelectedItem as VM_PlanViewport;
             foreach (VM_PlanViewport plan in _allPlans)
             {
-                plan.IsSourceExcluded = source != null && plan.Viewport.Id == source.Viewport.Id;
+                bool isSource = source != null && plan.Viewport.Id == source.Viewport.Id;
+                plan.IsSourceExcluded = isSource;
+                plan.IncompatibleReason = (source == null || isSource) ? null : plan.GetIncompatibility(source);
             }
         }
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
             foreach (VM_PlanViewport plan in _allPlans)
-                if (!plan.IsSourceExcluded) plan.IsSelected = true;
+                if (plan.CanSelect) plan.IsSelected = true;
         }
 
         private void SelectNone_Click(object sender, RoutedEventArgs e)

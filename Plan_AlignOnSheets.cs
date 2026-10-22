@@ -9,80 +9,38 @@ using System.Text;
 
 namespace Brand_25
 {
-    // Aligns the "setting-out" of selected plan viewports (on other sheets) to match
-    // a user-chosen source plan viewport, using the Project Base Point as the shared
-    // model-space reference.
+    // Aligns selected plan viewports on other sheets to the setting-out of a source
+    // plan viewport, using the Project Base Point as the shared model-space reference.
     //
-    // MEASUREMENT METHOD (v0.15): uses Revit's own OFFICIAL, documented model-to-sheet
-    // transform chain — View.GetModelToProjectionTransforms() (model space -> view
-    // projection space) combined with Viewport.GetProjectionToSheetTransform() (view
-    // projection space -> sheet/paper space), per Autodesk's own documented formula:
-    //     sheetXYZ = projectionToSheetTransform * modelToProjectionTransform * modelXYZ
-    // This is the same mechanism the Revit SDK's own "SheetToView3D" sample uses to
-    // convert a sheet click into a 3D model ray (in reverse). Unlike everything tried
-    // in earlier versions of this command, this is a real, supported API built
-    // specifically for converting between model space and sheet space — not something
-    // derived indirectly from crop-box or box-outline geometry.
-    //
-    // A view's crop can be split into multiple disjoint regions (rare, but supported
-    // by the API), each with its own transform and its own model-space boundary
-    // (TransformWithBoundary.GetBoundary()) — GetModelToProjectionTransforms() returns
-    // one entry per region. This command picks whichever region's boundary actually
-    // contains the model point being projected (PBP, or PBP-plus-test-offset for the
-    // rotation check); for the overwhelming majority of views (a single, non-split
-    // crop) there is exactly one region and this is a non-issue.
-    //
-    // VERSION HISTORY (each superseded after logged evidence showed it didn't work):
-    //   v0.10 — Viewport.GetBoxCenter() + View.CropBox math. Inconsistent, view-
-    //           specific offsets confirmed by comparing crop half-width/half-height
-    //           against Viewport.GetBoxOutline() on every view.
-    //   v0.11 — Same math wrapped in a temporary Annotation Crop toggle intended to
-    //           "clean" that mismatch. Logged corrections were exactly 0.00 on every
-    //           row — no measurable effect, so that theory was wrong.
-    //   v0.12 — Added GetLabelOutline()/crop-shape diagnostics rather than guessing
-    //           again; alignment still used the same unreliable formula.
-    //   v0.13 — Tried two temporary Grid elements read via
-    //           Grid.GetCurvesInView(DatumExtentType.ViewSpecific, sheet). That call
-    //           returned the grids' raw MODEL-space input coordinates unchanged, not a
-    //           paper-space projection — unusable for this. It also toggled
-    //           View.CropBoxActive without separately restoring View.CropBoxVisible,
-    //           visibly (and undesirably) re-enabling crop-boundary display on views
-    //           where it had deliberately been hidden.
-    //   v0.14 — Pure read-only calibration pass (no move) comparing a naive guess
-    //           against the sheet's own title block corner. The user's manually
-    //           measured ground truth confirmed the earlier formula's error varies
-    //           per-view with no discoverable pattern — conclusive evidence that
-    //           Viewport.GetBoxOutline()/GetBoxCenter() cannot be corrected into a
-    //           true crop-center reading from public API surface alone.
-    //   v0.15 (this version) — Revit's own documented model-to-sheet transform chain.
+    // The PBP is projected onto the sheet with Revit's own transform chain:
+    //     sheetXYZ = Viewport.GetProjectionToSheetTransform()
+    //              * View.GetModelToProjectionTransforms()[region] * modelXYZ
+    // and each target viewport is shifted by the difference to the source.
     [Transaction(TransactionMode.Manual)]
     public class Plan_AlignOnSheets : IExternalCommand
     {
         private const double MmPerFt = 304.8;
 
-        // Arbitrary non-zero test distance (model feet) used only to establish a
-        // second point for the rotation-direction comparison — see AreRotationsAligned.
+        // Second model point (PBP + this distance along X) used only to derive each
+        // plan's sheet-space rotation.
         private const double RotationTestDistanceFt = 50.0;
 
-        // Direction vectors are compared via the ABSOLUTE VALUE of their dot product —
-        // a line has no inherent forward/backward, so comparing raw (signed) direction
-        // would risk a false "rotation mismatch" if two views happened to produce
-        // opposite-signed (but really parallel) directions. Anything above this counts
-        // as "the same direction" (~0.06 degrees of tolerance).
-        private const double RotationAlignedDotThreshold = 0.999999;
+        // Rotations are compared as |dot| of the two directions (~0.06 degrees tolerance).
+        internal const double RotationAlignedDotThreshold = 0.999999;
+
+        private const double ResidualFlagThresholdMm = 1.0;
+        private const double OffSheetToleranceMm = 0.5;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
-            UIApplication uiApp = commandData.Application;
-            UIDocument uiDoc = uiApp.ActiveUIDocument;
+            UIDocument uiDoc = commandData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-08-24. Beta 0.15";
+            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.16";
 
             List<string> log = new List<string>();
 
             try
             {
-                // ---------------- Step 1: Project Base Point ----------------
                 BasePoint projectBasePoint = BasePoint.GetProjectBasePoint(doc);
                 if (projectBasePoint == null)
                 {
@@ -91,7 +49,6 @@ namespace Brand_25
                 }
                 XYZ pbp = projectBasePoint.Position;
 
-                // ---------------- Step 2: collect every qualifying plan viewport ----------------
                 List<VM_PlanViewport> allPlans = CollectQualifyingPlans(doc);
                 if (allPlans.Count == 0)
                 {
@@ -99,7 +56,12 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                // ---------------- Step 3: pre-select the active sheet's own plan, if any ----------------
+                // Rotation is measured up front so the dialog can grey out incompatible plans.
+                foreach (VM_PlanViewport plan in allPlans)
+                    plan.RotationDirection = Measure(plan.PlanView, plan.Viewport, pbp).Direction;
+
+                // Pre-select the largest plan on the active sheet; other plans on it
+                // (e.g. a key plan) stay available in the source combo.
                 VM_PlanViewport preSelectSource = null;
                 if (doc.ActiveView is ViewSheet activeSheet)
                 {
@@ -109,14 +71,13 @@ namespace Brand_25
                         .FirstOrDefault();
                 }
 
-                // ---------------- Step 4: dialog ----------------
-                Selection_PlanAlign dlg = new Selection_PlanAlign(allPlans, preSelectSource, credit);
+                Selection_PlanAlign dlg = new Selection_PlanAlign(allPlans, preSelectSource, credit, doc.ActiveView is ViewSheet);
                 if (dlg.ShowDialog() != true)
                     return Result.Cancelled;
 
                 VM_PlanViewport source = dlg.SelectedSource;
                 List<VM_PlanViewport> targets = dlg.SelectedTargets
-                    .Where(t => t.Viewport.Id != source.Viewport.Id) // defensive; UI already excludes this
+                    .Where(t => t.Viewport.Id != source.Viewport.Id)
                     .ToList();
 
                 if (targets.Count == 0)
@@ -125,179 +86,183 @@ namespace Brand_25
                     return Result.Cancelled;
                 }
 
-                // ---------------- Step 5: align ----------------
-                int alignedCount = 0;
-                List<string> rotationMismatches = new List<string>();
-                List<string> scaleMismatches = new List<string>();
-                List<string> errors = new List<string>();
-                List<string> largeResiduals = new List<string>();
-
-                const double residualFlagThresholdMm = 1.0;
-
                 log.Add("Plan Alignment — Log");
                 log.Add($"Run: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 log.Add($"Project: {doc.Title}");
                 log.Add($"Source: {source.ComboLabel}");
                 log.Add($"Project Base Point (model, mm): X={pbp.X * MmPerFt:F2}, Y={pbp.Y * MmPerFt:F2}, Z={pbp.Z * MmPerFt:F2}");
-                log.Add("Measurement method: View.GetModelToProjectionTransforms() + Viewport.GetProjectionToSheetTransform()");
                 log.Add(new string('-', 70));
                 log.Add("");
-                log.Add("=== Diagnostic Measurements (tab-separated; paste into Excel) ===");
+                log.Add("=== Measurements (tab-separated; paste into Excel) ===");
                 log.Add(DiagnosticHeader());
 
-                using (Transaction t = new Transaction(doc, "LW_Align Plans on Sheets"))
+                Measurement sourceMeasurement = Measure(source.PlanView, source.Viewport, pbp);
+                LogRow(log, source.ComboLabel, "SOURCE", source, sourceMeasurement);
+                if (!sourceMeasurement.Success)
                 {
-                    t.Start();
-
-                    XYZ sourcePaperPoint;
-                    XYZ sourceDir;
-                    try
-                    {
-                        ProjectionResult sourceResult = MeasureViaTransforms(doc, source.Sheet, source.PlanView, source.Viewport, pbp, source.ComboLabel, "SOURCE", log);
-                        if (!sourceResult.Success)
-                        {
-                            t.RollBack();
-                            new Warning("Oops...", $"Could not measure the source plan's setting-out: {sourceResult.Error}", credit).ShowDialog();
-                            return Result.Failed;
-                        }
-                        sourcePaperPoint = sourceResult.PaperPoint;
-                        sourceDir = sourceResult.TestDirection;
-                    }
-                    catch (Exception ex)
-                    {
-                        t.RollBack();
-                        new Warning("Oops...", $"Could not measure the source plan's setting-out: {ex.Message}", credit).ShowDialog();
-                        return Result.Failed;
-                    }
-
-                    foreach (VM_PlanViewport target in targets)
-                    {
-                        string label = target.ComboLabel;
-
-                        try
-                        {
-                            if (target.PlanView.Scale != source.PlanView.Scale)
-                            {
-                                log.Add($"  \u26A0 {label}  \u2014 scale (1:{target.PlanView.Scale}) differs from the source (1:{source.PlanView.Scale}); left untouched.");
-                                scaleMismatches.Add(label);
-                                continue;
-                            }
-
-                            ProjectionResult beforeResult = MeasureViaTransforms(doc, target.Sheet, target.PlanView, target.Viewport, pbp, label, "TARGET-BEFORE", log);
-                            if (!beforeResult.Success)
-                            {
-                                log.Add($"  \u2717 {label}  \u2014 error: {beforeResult.Error}");
-                                errors.Add(label);
-                                continue;
-                            }
-
-                            double rotationDot = Math.Abs(sourceDir.DotProduct(beforeResult.TestDirection));
-                            log.Add($"    Rotation check vs source: |dot|={rotationDot:F6} (threshold {RotationAlignedDotThreshold:F6})");
-
-                            if (rotationDot < RotationAlignedDotThreshold)
-                            {
-                                log.Add($"  \u26A0 {label}  \u2014 rotation differs from the source; left untouched.");
-                                rotationMismatches.Add(label);
-                                continue;
-                            }
-
-                            XYZ delta = sourcePaperPoint - beforeResult.PaperPoint;
-
-                            XYZ oldCenter = target.Viewport.GetBoxCenter();
-                            XYZ newCenter = new XYZ(oldCenter.X + delta.X, oldCenter.Y + delta.Y, 0);
-                            target.Viewport.SetBoxCenter(newCenter);
-                            doc.Regenerate();
-
-                            ProjectionResult afterResult = MeasureViaTransforms(doc, target.Sheet, target.PlanView, target.Viewport, pbp, label, "TARGET-AFTER", log);
-                            if (!afterResult.Success)
-                            {
-                                log.Add($"  \u2717 {label}  \u2014 moved, but could not re-measure afterward: {afterResult.Error}");
-                                errors.Add(label);
-                                continue;
-                            }
-
-                            XYZ residual = afterResult.PaperPoint - sourcePaperPoint;
-                            double residualMm = Math.Sqrt(residual.X * residual.X + residual.Y * residual.Y) * MmPerFt;
-                            log.Add($"    Residual vs source after move: dX={residual.X * MmPerFt:F2} mm, dY={residual.Y * MmPerFt:F2} mm (magnitude {residualMm:F2} mm)");
-
-                            log.Add($"  \u2705 {label}  \u2014 shifted by (X={delta.X * MmPerFt:F1} mm, Y={delta.Y * MmPerFt:F1} mm) on paper.");
-                            alignedCount++;
-
-                            if (residualMm > residualFlagThresholdMm)
-                            {
-                                largeResiduals.Add($"{label} (residual {residualMm:F2} mm)");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            log.Add($"  \u2717 {label}  \u2014 error: {ex.Message}");
-                            errors.Add(label);
-                        }
-                    }
-
-                    t.Commit();
+                    ShowFailure($"Could not measure the source plan's setting-out: {sourceMeasurement.Note}", log, credit);
+                    return Result.Failed;
                 }
 
-                // SetBoxCenter() updates the model correctly, but the active view's own
-                // on-screen graphics don't repaint until something (e.g. a pan) forces
-                // it — RefreshActiveView() is the documented fix for exactly this.
-                uiDoc.RefreshActiveView();
+                List<string> issues = new List<string>();
+                int alignedCount = 0;
 
-                // ---------------- Step 6: log + summary ----------------
+                // Ownership is checked up front: plans owned by someone else are
+                // reported at the end, everything else proceeds.
+                log.Add("");
+                log.Add("=== Alignment ===");
+                List<VM_PlanViewport> movable = new List<VM_PlanViewport>();
+                foreach (VM_PlanViewport target in targets)
+                {
+                    string blocker = GetEditBlocker(doc, target);
+                    if (blocker != null)
+                    {
+                        log.Add($"  ✗ {target.ComboLabel}  — not moved: {blocker}.");
+                        issues.Add($"{target.ComboLabel}: not moved — {blocker}");
+                    }
+                    else
+                    {
+                        movable.Add(target);
+                    }
+                }
+
+                if (movable.Count > 0)
+                {
+                    using (Transaction t = new Transaction(doc, "LW_Align Plans on Sheets"))
+                    {
+                        t.Start();
+
+                        foreach (VM_PlanViewport target in movable)
+                        {
+                            string label = target.ComboLabel;
+
+                            try
+                            {
+                                // Defensive: the dialog already greys these out.
+                                string incompatible = target.GetIncompatibility(source);
+                                if (incompatible != null)
+                                {
+                                    log.Add($"  ⚠ {label}  — skipped: {incompatible}.");
+                                    issues.Add($"{label}: skipped — {incompatible}");
+                                    continue;
+                                }
+
+                                Measurement before = Measure(target.PlanView, target.Viewport, pbp);
+                                LogRow(log, label, "TARGET-BEFORE", target, before);
+                                if (!before.Success)
+                                {
+                                    log.Add($"  ✗ {label}  — error: {before.Note}");
+                                    issues.Add($"{label}: {before.Note}");
+                                    continue;
+                                }
+
+                                XYZ delta = sourceMeasurement.PaperPoint - before.PaperPoint;
+
+                                XYZ oldCenter = target.Viewport.GetBoxCenter();
+                                target.Viewport.SetBoxCenter(new XYZ(oldCenter.X + delta.X, oldCenter.Y + delta.Y, 0));
+                                doc.Regenerate();
+
+                                Measurement after = Measure(target.PlanView, target.Viewport, pbp);
+                                LogRow(log, label, "TARGET-AFTER", target, after);
+                                if (!after.Success)
+                                {
+                                    log.Add($"  ✗ {label}  — moved, but could not re-measure afterward: {after.Note}");
+                                    issues.Add($"{label}: moved, but could not re-measure — {after.Note}");
+                                    continue;
+                                }
+
+                                XYZ residual = after.PaperPoint - sourceMeasurement.PaperPoint;
+                                double residualMm = Math.Sqrt(residual.X * residual.X + residual.Y * residual.Y) * MmPerFt;
+                                log.Add($"    Residual vs source: dX={residual.X * MmPerFt:F2} mm, dY={residual.Y * MmPerFt:F2} mm (magnitude {residualMm:F2} mm)");
+                                log.Add($"  ✅ {label}  — shifted by (X={delta.X * MmPerFt:F1} mm, Y={delta.Y * MmPerFt:F1} mm) on paper.");
+                                alignedCount++;
+
+                                if (residualMm > ResidualFlagThresholdMm)
+                                    issues.Add($"{label}: residual gap {residualMm:F2} mm after alignment");
+
+                                string overhang = DescribeOverhang(target.Sheet, target.Viewport);
+                                if (overhang != null)
+                                {
+                                    log.Add($"    ⚠ viewport now extends beyond the sheet: {overhang}.");
+                                    issues.Add($"{label}: now extends beyond the sheet — {overhang}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                log.Add($"  ✗ {label}  — error: {ex.Message}");
+                                issues.Add($"{label}: {ex.Message}");
+                            }
+                        }
+
+                        t.Commit();
+                    }
+
+                    // SetBoxCenter updates the model, but the active view doesn't repaint on its own.
+                    uiDoc.RefreshActiveView();
+                }
+
                 log.Add("");
                 log.Add($"{alignedCount} of {targets.Count} plan(s) aligned.");
-                if (scaleMismatches.Count > 0)
-                    log.Add($"{scaleMismatches.Count} plan(s) skipped — scale differs from the source (see \u26A0 entries above).");
-                if (rotationMismatches.Count > 0)
-                    log.Add($"{rotationMismatches.Count} plan(s) skipped — rotation differs from the source (see \u26A0 entries above).");
-                if (errors.Count > 0)
-                    log.Add($"{errors.Count} plan(s) failed with an error (see \u2717 entries above).");
-                if (largeResiduals.Count > 0)
+                if (issues.Count > 0)
                 {
                     log.Add("");
-                    log.Add($"{largeResiduals.Count} plan(s) still show a residual gap greater than {residualFlagThresholdMm:F1} mm after alignment " +
-                        "(this checks the move math's own self-consistency against the same transform chain used for measurement):");
-                    log.AddRange(largeResiduals.Select(r => $"  {r}"));
+                    log.Add($"=== {issues.Count} issues ===");
+                    log.AddRange(issues.Select(i => $"  {i}"));
                 }
 
-                string logFilePath = Path.Combine(Path.GetTempPath(), $"Plan_AlignOnSheets_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                string logWriteError = null;
-                try { File.WriteAllLines(logFilePath, log); }
-                catch (Exception ex) { logWriteError = ex.Message; }
+                string logPath = WriteLog(log, out string logError);
 
-                // Kept short and free of implementation detail — the log (via the "Log
-                // Folder" button, shown only when there's something worth checking) is
-                // where anything technical belongs.
                 StringBuilder summary = new StringBuilder();
                 summary.AppendLine($"{alignedCount} of {targets.Count} plan(s) aligned to \"{source.ComboLabel}\".");
-                if (scaleMismatches.Count > 0)
-                    summary.AppendLine($"{scaleMismatches.Count} plan(s) skipped \u2014 scale differs from the source.");
-                if (rotationMismatches.Count > 0)
-                    summary.AppendLine($"{rotationMismatches.Count} plan(s) skipped \u2014 rotation differs from the source.");
-                if (errors.Count > 0)
-                    summary.AppendLine($"{errors.Count} plan(s) failed \u2014 see log.");
-                if (largeResiduals.Count > 0)
-                    summary.AppendLine($"{largeResiduals.Count} plan(s) still show a gap > {residualFlagThresholdMm:F1} mm \u2014 see log for diagnostics.");
-                if (logWriteError != null)
-                    summary.AppendLine($"\nLog FAILED to write: {logWriteError}");
-
-                bool hasNotesForLog = scaleMismatches.Count > 0 || rotationMismatches.Count > 0 || errors.Count > 0 || largeResiduals.Count > 0;
+                if (issues.Count > 0)
+                    summary.AppendLine($"{issues.Count} issues founded - see log");
+                if (logError != null)
+                    summary.AppendLine($"\nLog FAILED to write: {logError}");
 
                 new WarningLarge("Align Plans Complete", summary.ToString(), credit,
-                    revealPath: (logWriteError == null && hasNotesForLog) ? logFilePath : null).ShowDialog();
+                    revealPath: (logError == null && issues.Count > 0) ? logPath : null).ShowDialog();
 
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
                 message = ex.Message;
-                TaskDialog.Show("Error", $"An error occurred: {ex.Message}\n\nDebug Log:\n{string.Join("\n", log)}");
+                log.Add("");
+                log.Add(ex.ToString());
+                ShowFailure($"An error occurred: {ex.Message}", log, credit);
                 return Result.Failed;
             }
         }
 
+        // ---------------- Logging / warnings ----------------
+
+        private static string WriteLog(List<string> log, out string error)
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"Plan_AlignOnSheets_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            error = null;
+            try
+            {
+                File.WriteAllLines(path, log);
+                return path;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return null;
+            }
+        }
+
+        private static void ShowFailure(string text, List<string> log, string credit)
+        {
+            log.Add("");
+            log.Add($"FAILED: {text}");
+            string path = WriteLog(log, out string writeError);
+            new Warning("Oops...", text, credit, revealPath: writeError == null ? path : null).ShowDialog();
+        }
+
         // ---------------- Collection ----------------
 
+        // Structural Plan views are reported by the API as ViewType.EngineeringPlan.
         private static readonly ViewType[] QualifyingPlanTypes =
         {
             ViewType.FloorPlan, ViewType.CeilingPlan, ViewType.AreaPlan, ViewType.EngineeringPlan
@@ -320,7 +285,7 @@ namespace Brand_25
                     if (!(doc.GetElement(viewportId) is Viewport vp)) continue;
                     if (!(doc.GetElement(vp.ViewId) is View v)) continue;
                     if (v.IsTemplate) continue;
-                    if (!IsQualifyingPlanType(v.ViewType)) continue;
+                    if (!QualifyingPlanTypes.Contains(v.ViewType)) continue;
 
                     result.Add(new VM_PlanViewport(sheet, vp, v));
                 }
@@ -329,104 +294,125 @@ namespace Brand_25
             return result;
         }
 
-        // ViewType has no distinct "StructuralPlan" member — Structural Plan views in
-        // the API are reported as ViewType.EngineeringPlan.
-        private static bool IsQualifyingPlanType(ViewType viewType) =>
-            QualifyingPlanTypes.Contains(viewType);
+        // ---------------- Ownership ----------------
 
-        // ---------------- Measurement via Revit's official model-to-sheet transform chain ----------------
-
-        private class ProjectionResult
+        // Returns why this plan's viewport (or its sheet) can't be edited right now —
+        // owned by another user, or changed in the central model since the last sync —
+        // or null when it can (always null in a non-workshared project).
+        private static string GetEditBlocker(Document doc, VM_PlanViewport plan)
         {
-            public bool Success;
-            public string Error;
-            public XYZ PaperPoint;
-            public XYZ TestDirection; // sheet-space direction from PaperPoint toward a second test point — for rotation comparison only
-        }
+            if (!doc.IsWorkshared) return null;
 
-        private static string DiagnosticHeader() => string.Join("\t",
-            "Label", "Stage", "SheetNumber", "ViewName", "ViewportType", "ViewScale",
-            "HasViewTransforms", "HasViewportTransforms", "TransformRegionCount",
-            "SheetX_mm", "SheetY_mm",
-            // Title-block-relative columns were calibration-only — used to verify the
-            // transform chain against a manually measured ground truth (confirmed to
-            // match exactly). No longer needed now that the method is trusted; left
-            // commented out (rather than removed) alongside the code that populates
-            // them below, in case a future measurement method needs recalibrating the
-            // same way. See LogRow for the matching commented-out block.
-            // "TitleBlockFound", "TitleBlockMinX_mm", "TitleBlockMinY_mm",
-            // "SheetRelTitleBlockX_mm", "SheetRelTitleBlockY_mm",
-            "TestDirX", "TestDirY",
-            "Note");
-
-        // Projects PBP (and a second, nearby test point, for the caller's own rotation
-        // comparison) from model space to sheet/paper space via Revit's documented
-        // transform chain, and logs one diagnostic row. TitleBlock columns are also
-        // included — carried over from the previous calibration round — purely so this
-        // measurement can be sanity-checked against the same manually-measured ground
-        // truth already gathered, without needing another round-trip.
-        private static ProjectionResult MeasureViaTransforms(Document doc, ViewSheet sheet, View view, Viewport vp, XYZ pbp, string label, string stage, List<string> log)
-        {
-            ProjectionResult result = new ProjectionResult { Success = false };
-
-            bool hasViewTransforms = false, hasViewportTransforms = false;
-            try { hasViewTransforms = view.HasViewTransforms(); } catch { }
-            try { hasViewportTransforms = vp.HasViewportTransforms(); } catch { }
-
-            if (!hasViewTransforms || !hasViewportTransforms)
-            {
-                result.Error = $"This view/viewport does not report model-to-sheet transforms (HasViewTransforms={hasViewTransforms}, HasViewportTransforms={hasViewportTransforms}).";
-                LogRow(log, label, stage, sheet, view, vp, hasViewTransforms, hasViewportTransforms, 0, null, null, result.Error);
-                return result;
-            }
-
-            Transform projToSheet;
-            IList<TransformWithBoundary> transforms;
             try
             {
-                projToSheet = vp.GetProjectionToSheetTransform();
-                transforms = view.GetModelToProjectionTransforms();
+                foreach (Element element in new Element[] { plan.Viewport, plan.Sheet })
+                {
+                    string what = element is Viewport ? "viewport" : "sheet";
+
+                    CheckoutStatus status = WorksharingUtils.GetCheckoutStatus(doc, element.Id, out string owner);
+                    if (status == CheckoutStatus.OwnedByOtherUser)
+                        return $"the {what} is owned by {(string.IsNullOrEmpty(owner) ? "another user" : owner)}";
+
+                    if (WorksharingUtils.GetModelUpdatesStatus(doc, element.Id) == ModelUpdatesStatus.UpdatedInCentral)
+                        return $"the {what} was changed in the central model — reload latest first";
+                }
+            }
+            catch
+            {
+                // Status unavailable — don't block; a real failure is caught and logged when the move is attempted.
+            }
+
+            return null;
+        }
+
+        // ---------------- Off-sheet check ----------------
+
+        // Describes how far the viewport's box extends past the sheet edges
+        // (e.g. "left 12.0 mm, top 3.5 mm"), or null when it is within the sheet.
+        private static string DescribeOverhang(ViewSheet sheet, Viewport vp)
+        {
+            try
+            {
+                BoundingBoxUV sheetBox = sheet.Outline;
+                if (sheetBox.Max.U - sheetBox.Min.U <= 0 || sheetBox.Max.V - sheetBox.Min.V <= 0) return null;
+
+                Outline box = vp.GetBoxOutline();
+                double tolerance = OffSheetToleranceMm / MmPerFt;
+
+                List<string> sides = new List<string>();
+                double left = sheetBox.Min.U - box.MinimumPoint.X;
+                double right = box.MaximumPoint.X - sheetBox.Max.U;
+                double bottom = sheetBox.Min.V - box.MinimumPoint.Y;
+                double top = box.MaximumPoint.Y - sheetBox.Max.V;
+
+                if (left > tolerance) sides.Add($"left {left * MmPerFt:F1} mm");
+                if (right > tolerance) sides.Add($"right {right * MmPerFt:F1} mm");
+                if (bottom > tolerance) sides.Add($"bottom {bottom * MmPerFt:F1} mm");
+                if (top > tolerance) sides.Add($"top {top * MmPerFt:F1} mm");
+
+                return sides.Count == 0 ? null : string.Join(", ", sides);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // ---------------- Measurement ----------------
+
+        private class Measurement
+        {
+            public bool Success;
+            public string Note;
+            public int RegionCount;
+            public XYZ PaperPoint;  // PBP on the sheet
+            public XYZ Direction;   // sheet-space direction of model +X; for the rotation comparison only
+        }
+
+        private static Measurement Measure(View view, Viewport vp, XYZ pbp)
+        {
+            Measurement m = new Measurement();
+
+            try
+            {
+                if (!view.HasViewTransforms() || !vp.HasViewportTransforms())
+                {
+                    m.Note = "This view/viewport does not report model-to-sheet transforms.";
+                    return m;
+                }
+
+                Transform projToSheet = vp.GetProjectionToSheetTransform();
+                IList<TransformWithBoundary> transforms = view.GetModelToProjectionTransforms();
+                if (transforms == null || transforms.Count == 0)
+                {
+                    m.Note = "No model-to-projection transforms were returned for this view.";
+                    return m;
+                }
+
+                XYZ testPoint = pbp + XYZ.BasisX * RotationTestDistanceFt;
+                XYZ sheetPbp = ProjectThroughRegion(ChooseRegion(transforms, pbp), projToSheet, pbp);
+                XYZ sheetTest = ProjectThroughRegion(ChooseRegion(transforms, testPoint), projToSheet, testPoint);
+
+                XYZ direction = sheetTest - sheetPbp;
+                direction = direction.IsZeroLength() ? XYZ.BasisX : direction.Normalize();
+
+                m.RegionCount = transforms.Count;
+                m.PaperPoint = new XYZ(sheetPbp.X, sheetPbp.Y, 0);
+                m.Direction = direction;
+                m.Success = true;
+                m.Note = "OK";
             }
             catch (Exception ex)
             {
-                result.Error = $"Could not retrieve transforms: {ex.Message}";
-                LogRow(log, label, stage, sheet, view, vp, hasViewTransforms, hasViewportTransforms, 0, null, null, result.Error);
-                return result;
+                m.Note = $"Could not measure: {ex.Message}";
             }
 
-            if (transforms == null || transforms.Count == 0)
-            {
-                result.Error = "No model-to-projection transforms were returned for this view.";
-                LogRow(log, label, stage, sheet, view, vp, hasViewTransforms, hasViewportTransforms, 0, null, null, result.Error);
-                return result;
-            }
-
-            XYZ testModelPoint = pbp + XYZ.BasisX * RotationTestDistanceFt;
-
-            TransformWithBoundary regionForPbp = ChooseRegion(transforms, pbp);
-            TransformWithBoundary regionForTest = ChooseRegion(transforms, testModelPoint);
-
-            XYZ sheetPbp = ProjectThroughRegion(regionForPbp, projToSheet, pbp);
-            XYZ sheetTest = ProjectThroughRegion(regionForTest, projToSheet, testModelPoint);
-
-            XYZ testDir = sheetTest - sheetPbp;
-            if (testDir.IsZeroLength()) testDir = XYZ.BasisX; // degenerate; harmless fallback for the rotation check only
-            testDir = testDir.Normalize();
-
-            result.Success = true;
-            result.PaperPoint = new XYZ(sheetPbp.X, sheetPbp.Y, 0);
-            result.TestDirection = testDir;
-
-            LogRow(log, label, stage, sheet, view, vp, hasViewTransforms, hasViewportTransforms, transforms.Count, result.PaperPoint, testDir, "OK");
-            return result;
+            return m;
         }
 
-        // Picks whichever region's model-space boundary contains the given point —
-        // relevant only for views whose crop has been split into multiple disjoint
-        // regions. Falls back to the first region if none explicitly contains the
-        // point (e.g. it happens to fall just outside every crop boundary) or if a
-        // region's own boundary is null (a single, uncropped/simple region, per the
-        // API's own documented behavior).
+        // A view's crop can be split into disjoint regions, each with its own transform
+        // and model-space boundary; pick the one containing the point. Falls back to the
+        // first region (also used when a region has no boundary, i.e. a simple crop).
         private static TransformWithBoundary ChooseRegion(IList<TransformWithBoundary> transforms, XYZ modelPoint)
         {
             foreach (TransformWithBoundary twb in transforms)
@@ -441,28 +427,25 @@ namespace Brand_25
 
         private static XYZ ProjectThroughRegion(TransformWithBoundary region, Transform projToSheet, XYZ modelPoint)
         {
-            Transform modelToProj = region.GetModelToProjectionTransform();
-            XYZ projectionPoint = modelToProj.OfPoint(modelPoint);
+            XYZ projectionPoint = region.GetModelToProjectionTransform().OfPoint(modelPoint);
             return projToSheet.OfPoint(projectionPoint);
         }
 
-        // Point-in-curveloop test for a planar 3D CurveLoop, via a parity (even/odd)
-        // ray-crossing count — ported from the Revit SDK's own "SheetToView3D" sample
-        // (MakeView3D.IsPointInsideCurveLoop), which uses this exact technique to
-        // decide which crop region a given model point belongs to.
+        // Parity (even/odd) ray-crossing test for a planar 3D CurveLoop, as in the
+        // Revit SDK "SheetToView3D" sample.
         private static bool IsPointInsideCurveLoop(XYZ point, CurveLoop curveLoop)
         {
             List<Curve> curves = curveLoop.ToList();
-            if (curves.Count < 3) return true; // degenerate boundary; don't block on this
+            if (curves.Count < 3) return true;
 
             Plane plane;
             try { plane = Plane.CreateByThreePoints(curves[0].GetEndPoint(0), curves[1].GetEndPoint(0), curves[2].GetEndPoint(0)); }
-            catch { return true; } // can't determine the plane; don't block
+            catch { return true; }
 
             plane.Project(point, out UV uv, out _);
             XYZ projectedPoint = plane.Origin + plane.XVec * uv.U + plane.YVec * uv.V;
 
-            const double randomXScale = 5631, randomYScale = 4369; // arbitrary, non-axis-aligned — matches the SDK sample
+            const double randomXScale = 5631, randomYScale = 4369; // arbitrary, non-axis-aligned
             Line veryLongLine = Line.CreateBound(projectedPoint, projectedPoint + randomXScale * plane.XVec + randomYScale * plane.YVec);
 
             int intersectionCount = 0;
@@ -475,52 +458,23 @@ namespace Brand_25
             return (intersectionCount % 2) == 1;
         }
 
-        private static void LogRow(List<string> log, string label, string stage, ViewSheet sheet, View view, Viewport vp,
-            bool hasViewTransforms, bool hasViewportTransforms, int regionCount, XYZ sheetPoint, XYZ testDir, string note)
+        // ---------------- Measurement log ----------------
+
+        private static string DiagnosticHeader() => string.Join("\t",
+            "Label", "Stage", "SheetNumber", "ViewName", "ViewportType", "ViewScale", "TransformRegions",
+            "SheetX_mm", "SheetY_mm", "TestDirX", "TestDirY", "Note");
+
+        private static void LogRow(List<string> log, string label, string stage, VM_PlanViewport plan, Measurement m)
         {
-            string viewportTypeName = GetElementName(view, vp.GetTypeId());
+            string viewportType = plan.Viewport.Document.GetElement(plan.Viewport.GetTypeId())?.Name ?? "Unknown";
 
-            // Calibration-only (see the matching commented-out header columns above) —
-            // was used to verify the transform-chain measurement against a manually
-            // measured ground truth from the title block's corner (confirmed exact
-            // match). Left here, commented out, rather than deleted, in case a future
-            // measurement method needs the same kind of recalibration.
-            //
-            // FamilyInstance titleBlock = new FilteredElementCollector(view.Document, sheet.Id)
-            //     .OfCategory(BuiltInCategory.OST_TitleBlocks)
-            //     .WhereElementIsNotElementType()
-            //     .Cast<FamilyInstance>()
-            //     .FirstOrDefault();
-            //
-            // BoundingBoxXYZ titleBlockBox = null;
-            // try { titleBlockBox = titleBlock?.get_BoundingBox(sheet); }
-            // catch { }
-            // bool titleBlockFound = titleBlockBox != null;
+            string Mm(XYZ p, bool useX) => p == null ? "N/A" : ((useX ? p.X : p.Y) * MmPerFt).ToString("F2");
+            string Dir(XYZ v, bool useX) => v == null ? "N/A" : (useX ? v.X : v.Y).ToString("F6");
 
-            string F(double v) => (v * MmPerFt).ToString("F2");
-            string FX(XYZ p, bool useX) => p == null ? "N/A" : F(useX ? p.X : p.Y);
-            string FDir(XYZ v, bool useX) => v == null ? "N/A" : (useX ? v.X : v.Y).ToString("F6");
-
-            // string relX = (sheetPoint != null && titleBlockFound) ? F(sheetPoint.X - titleBlockBox.Min.X) : "N/A";
-            // string relY = (sheetPoint != null && titleBlockFound) ? F(sheetPoint.Y - titleBlockBox.Min.Y) : "N/A";
-
-            string row = string.Join("\t",
-                label, stage, sheet.SheetNumber, view.Name, viewportTypeName, view.Scale.ToString(),
-                hasViewTransforms.ToString(), hasViewportTransforms.ToString(), regionCount.ToString(),
-                FX(sheetPoint, true), FX(sheetPoint, false),
-                // titleBlockFound.ToString(),
-                // titleBlockFound ? F(titleBlockBox.Min.X) : "N/A",
-                // titleBlockFound ? F(titleBlockBox.Min.Y) : "N/A",
-                // relX, relY,
-                FDir(testDir, true), FDir(testDir, false),
-                note);
-
-            log.Add(row);
+            log.Add(string.Join("\t",
+                label, stage, plan.SheetNumber, plan.ViewName, viewportType, plan.Scale.ToString(), m.RegionCount.ToString(),
+                Mm(m.PaperPoint, true), Mm(m.PaperPoint, false), Dir(m.Direction, true), Dir(m.Direction, false),
+                m.Note));
         }
-
-        // Small helper purely so LogRow can resolve the viewport type's display name
-        // without needing a separate Document parameter threaded through every call.
-        private static string GetElementName(View view, ElementId id) =>
-            view.Document.GetElement(id)?.Name ?? "Unknown";
     }
 }

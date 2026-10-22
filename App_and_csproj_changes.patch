@@ -1,0 +1,31 @@
+diff --git a/App.cs b/App.cs
+index 94e5183..b1d06f9 100644
+--- a/App.cs
++++ b/App.cs
+@@ -145,6 +145,11 @@ namespace Brand_25
+             btnData3e.ToolTip = "Create floor finishes from selected rooms (outline at wall finish), bottom aligned to the level plus an optional offset.";
+             panelLuna.AddItem(btnData3e);
+ 
++            PushButtonData btnLunaMass = new PushButtonData("btnLunaMass", "Create Mass\nFrom Excel", Assembly.GetExecutingAssembly().Location, "Brand_25.Luna_CreateMassFromExcel");
++            btnLunaMass.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
++            btnLunaMass.ToolTip = "Create one MASS_AreaPlanning_Box instance per room listed in an Excel room schedule, typed by Area Group colour and laid out in rows from grid A-1 on each level.";
++            panelLuna.AddItem(btnLunaMass);
++
+ 
+             SplitButtonData sb1 = new SplitButtonData("splitButton1", "split");
+             SplitButton sb = panel4.AddItem(sb1) as SplitButton;
+diff --git a/Brand_25.csproj b/Brand_25.csproj
+index 52210ab..354d9d6 100644
+--- a/Brand_25.csproj
++++ b/Brand_25.csproj
+@@ -53,6 +53,10 @@
+     </Reference>
+   </ItemGroup>
+ 
++  <ItemGroup>
++    <PackageReference Include="ExcelDataReader" Version="3.7.0" />
++  </ItemGroup>
++
+   <ItemGroup>
+     <None Include="Brand_25.addin">
+       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
