@@ -45,7 +45,7 @@ namespace Brand_25
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.1";
+            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.2";
 
             List<string> log = new List<string>
             {
@@ -77,6 +77,11 @@ namespace Brand_25
 
                 List<RenamePlan> plans = new List<RenamePlan>();
 
+                // marker id -> the plan views it appears in. Built only if some marker turns out
+                // not to know its owner plan (Room_CreateIntElev creates markers without one).
+                Lazy<Dictionary<ElementId, List<ViewPlan>>> plansByMarker =
+                    new Lazy<Dictionary<ElementId, List<ViewPlan>>>(() => BuildPlansByMarker(doc));
+
                 IEnumerable<ElevationMarker> markers = new FilteredElementCollector(doc)
                     .OfClass(typeof(ElevationMarker))
                     .Cast<ElevationMarker>()
@@ -104,27 +109,42 @@ namespace Brand_25
                     List<ViewSection> candidates = hosted.Where(v => SuffixPattern.IsMatch(v.Name)).ToList();
                     if (candidates.Count == 0) continue;
 
-                    // Marker position and level (the level of the plan the marker sits in).
-                    ViewPlan ownerPlan = doc.GetElement(marker.OwnerViewId) as ViewPlan;
-                    Level level = ownerPlan?.GenLevel;
-                    XYZ point = GetMarkerPoint(marker, ownerPlan);
-
                     foreach (ViewSection view in candidates)
                     {
                         considered++;
 
-                        if (level == null || point == null)
+                        // Phase the rooms are matched on: the elevation's own, falling back to the plan's.
+                        ElementId phaseId = view.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId()
+                                            ?? ElementId.InvalidElementId;
+
+                        // The plan the elevation was made from gives the level (and a fallback phase).
+                        ViewPlan hostPlan = FindHostPlan(doc, marker, phaseId, plansByMarker);
+                        if (phaseId == ElementId.InvalidElementId && hostPlan != null)
+                            phaseId = hostPlan.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId()
+                                      ?? ElementId.InvalidElementId;
+
+                        // Level: from the host plan, else from the elevation's "Associated Level".
+                        // If neither works the room is matched on position alone (see FindRoomAtPoint).
+                        Level level = hostPlan?.GenLevel ?? FindLevelFromAssociatedLevel(doc, view);
+
+                        // Position: marker location, else the elevation view's origin, else the marker's
+                        // bounding box. Only X/Y are used - Z is matched against each room itself.
+                        XYZ point = GetMarkerPoint(marker, view, hostPlan, out string pointSource);
+
+                        if (point == null)
                         {
                             issueCount++;
-                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): cannot work out the marker's location or level - not renamed");
+                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): cannot work out the marker's location " +
+                                    $"[{pointSource}; owner view: {(marker.OwnerViewId == ElementId.InvalidElementId ? "none" : "set")}; " +
+                                    $"host plan: {(hostPlan != null ? hostPlan.Name : "none")}] - not renamed");
                             continue;
                         }
 
-                        // Rooms are matched on the elevation's own phase, falling back to the plan's.
-                        ElementId phaseId =
-                            view.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId() ??
-                            ownerPlan?.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId() ??
-                            ElementId.InvalidElementId;
+                        if (level == null)
+                        {
+                            log.Add($"[Note] '{view.Name}' (Id {view.Id.Value}): level could not be determined; " +
+                                    $"room matched on position alone (location from {pointSource})");
+                        }
 
                         Room room = FindRoomAtPoint(doc, rooms, point, level, phaseId, view, out string problem);
                         if (room == null)
@@ -268,14 +288,108 @@ namespace Brand_25
             return $"{room.Number} {roomName} - {suffix}";
         }
 
-        // The marker's centre: its location point, or the centre of its bounding box in the
-        // plan it sits in when no location point is available.
-        private static XYZ GetMarkerPoint(ElevationMarker marker, ViewPlan ownerPlan)
+        // marker id -> the plan views it shows up in, found by asking each plan which elevation
+        // markers it contains. Room_CreateIntElev creates its markers without an owner plan, so
+        // marker.OwnerViewId is empty and this is the way back to the plan (and so the level).
+        private static Dictionary<ElementId, List<ViewPlan>> BuildPlansByMarker(Document doc)
         {
-            if (marker.Location is LocationPoint lp) return lp.Point;
+            Dictionary<ElementId, List<ViewPlan>> map = new Dictionary<ElementId, List<ViewPlan>>();
 
-            BoundingBoxXYZ box = ownerPlan != null ? marker.get_BoundingBox(ownerPlan) : null;
-            return box != null ? (box.Min + box.Max) * 0.5 : null;
+            IEnumerable<ViewPlan> plans = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewPlan))
+                .Cast<ViewPlan>()
+                .Where(p => !p.IsTemplate && p.GenLevel != null);
+
+            foreach (ViewPlan plan in plans)
+            {
+                try
+                {
+                    foreach (ElementId markerId in new FilteredElementCollector(doc, plan.Id)
+                                 .OfClass(typeof(ElevationMarker))
+                                 .ToElementIds())
+                    {
+                        if (!map.TryGetValue(markerId, out List<ViewPlan> list))
+                        {
+                            list = new List<ViewPlan>();
+                            map[markerId] = list;
+                        }
+                        list.Add(plan);
+                    }
+                }
+                catch (Exception)
+                {
+                    // a plan that cannot be scoped by a collector - skip it
+                }
+            }
+
+            return map;
+        }
+
+        // The plan the elevations were made from: the marker's owner view when it has one,
+        // otherwise a plan that shows the marker (preferring one in the same phase).
+        private static ViewPlan FindHostPlan(Document doc, ElevationMarker marker, ElementId phaseId,
+                                             Lazy<Dictionary<ElementId, List<ViewPlan>>> plansByMarker)
+        {
+            ViewPlan owner = doc.GetElement(marker.OwnerViewId) as ViewPlan;
+            if (owner != null) return owner;
+
+            if (!plansByMarker.Value.TryGetValue(marker.Id, out List<ViewPlan> plans) || plans.Count == 0)
+                return null;
+
+            ViewPlan samePhase = plans.FirstOrDefault(p =>
+                p.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId() == phaseId);
+            return samePhase ?? plans[0];
+        }
+
+        // Fallback when no host plan is found: the elevation's own "Associated Level" parameter,
+        // matched to a level by name.
+        private static Level FindLevelFromAssociatedLevel(Document doc, View view)
+        {
+            Parameter p = view.get_Parameter(BuiltInParameter.PLAN_VIEW_LEVEL);
+            string levelName = p?.AsString() ?? p?.AsValueString();
+            if (string.IsNullOrEmpty(levelName)) return null;
+
+            return new FilteredElementCollector(doc)
+                .OfClass(typeof(Level))
+                .Cast<Level>()
+                .FirstOrDefault(l => l.Name == levelName);
+        }
+
+        // The marker's position, trying in turn: the marker's own location point, the elevation
+        // view's origin, then the centre of the marker's bounding box in its host plan. Only
+        // X/Y of the result are used. 'source' says which one worked (or why none did).
+        private static XYZ GetMarkerPoint(ElevationMarker marker, ViewSection view, ViewPlan hostPlan, out string source)
+        {
+            if (marker.Location is LocationPoint lp)
+            {
+                source = "marker location";
+                return lp.Point;
+            }
+
+            try
+            {
+                XYZ origin = view.Origin;
+                if (origin != null)
+                {
+                    source = "elevation view origin";
+                    return origin;
+                }
+            }
+            catch (Exception)
+            {
+                // fall through to the bounding box
+            }
+
+            BoundingBoxXYZ box = hostPlan != null ? marker.get_BoundingBox(hostPlan) : null;
+            if (box != null)
+            {
+                source = "marker bounding box";
+                return (box.Min + box.Max) * 0.5;
+            }
+
+            source = $"marker.Location is {(marker.Location == null ? "null" : marker.Location.GetType().Name)}, " +
+                     "view origin and bounding box unavailable";
+            return null;
         }
 
         // The room that contains the point, on the given level and phase. When the same spot
@@ -290,7 +404,7 @@ namespace Brand_25
             List<Room> found = new List<Room>();
             foreach (RoomInfo info in rooms)
             {
-                if (info.Room.LevelId != level.Id) continue;
+                if (level != null && info.Room.LevelId != level.Id) continue;   // level unknown: position only
                 if (phaseId != ElementId.InvalidElementId && info.PhaseId != phaseId) continue;
 
                 BoundingBoxXYZ b = info.Box;
@@ -331,7 +445,8 @@ namespace Brand_25
             if (found.Count > 1)
             {
                 problem = "more than one room found at the elevation marker's location (" +
-                          string.Join(", ", found.Select(r => r.Number)) + ")";
+                          string.Join(", ", found.Select(r => r.Number)) + ")" +
+                          (level == null ? "; the level could not be determined" : "");
                 return null;
             }
 
