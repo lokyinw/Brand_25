@@ -74,7 +74,8 @@ namespace Brand_25
         }
 
         // Greys out (and unticks) the source itself and every plan whose scale or
-        // rotation differs from the source; re-run whenever the source changes.
+        // rotation differs from the source, and collapses sheets with nothing left to
+        // pick; re-run whenever the source changes.
         private void UpdateAvailability()
         {
             VM_PlanViewport source = SourceCombo.SelectedItem as VM_PlanViewport;
@@ -84,6 +85,9 @@ namespace Brand_25
                 plan.IsSourceExcluded = isSource;
                 plan.IncompatibleReason = (source == null || isSource) ? null : plan.GetIncompatibility(source);
             }
+
+            foreach (VM_PlanSheetGroup group in _sheetGroups)
+                group.RefreshExpansion();
         }
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)

@@ -35,7 +35,7 @@ namespace Brand_25
         {
             UIDocument uiDoc = commandData.Application.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.16";
+            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.17";
 
             List<string> log = new List<string>();
 
@@ -107,6 +107,15 @@ namespace Brand_25
                 List<string> issues = new List<string>();
                 int alignedCount = 0;
 
+                // Each target takes on the source's viewport type and title position.
+                ElementId sourceTypeId = source.Viewport.GetTypeId();
+                XYZ sourceTitleAnchor = GetTitleAnchor(source.Viewport, out string titleAnchorNote);
+                if (sourceTitleAnchor == null)
+                {
+                    log.Add($"Note: titles will not be aligned — {titleAnchorNote}.");
+                    issues.Add($"Titles not aligned — {titleAnchorNote}");
+                }
+
                 // Ownership is checked up front: plans owned by someone else are
                 // reported at the end, everything else proceeds.
                 log.Add("");
@@ -147,6 +156,8 @@ namespace Brand_25
                                     continue;
                                 }
 
+                                MatchViewportType(doc, target, sourceTypeId, log, issues);
+
                                 Measurement before = Measure(target.PlanView, target.Viewport, pbp);
                                 LogRow(log, label, "TARGET-BEFORE", target, before);
                                 if (!before.Success)
@@ -180,6 +191,9 @@ namespace Brand_25
                                 if (residualMm > ResidualFlagThresholdMm)
                                     issues.Add($"{label}: residual gap {residualMm:F2} mm after alignment");
 
+                                if (sourceTitleAnchor != null)
+                                    AlignTitle(doc, source.Viewport, target, sourceTitleAnchor, log, issues);
+
                                 string overhang = DescribeOverhang(target.Sheet, target.Viewport);
                                 if (overhang != null)
                                 {
@@ -197,7 +211,9 @@ namespace Brand_25
                         t.Commit();
                     }
 
-                    // SetBoxCenter updates the model, but the active view doesn't repaint on its own.
+                    // Regenerate already ran inside the transaction; what goes stale is the
+                    // display of sheets that are open but not active, so redraw every open view.
+                    uiDoc.UpdateAllOpenViews();
                     uiDoc.RefreshActiveView();
                 }
 
@@ -323,6 +339,104 @@ namespace Brand_25
             }
 
             return null;
+        }
+
+        // ---------------- Viewport type and title ----------------
+
+        // Switches the target viewport to the source's viewport type so the title
+        // symbol matches. A failure is logged and reported; alignment carries on.
+        private static void MatchViewportType(Document doc, VM_PlanViewport target, ElementId sourceTypeId, List<string> log, List<string> issues)
+        {
+            Viewport vp = target.Viewport;
+            if (vp.GetTypeId() == sourceTypeId) return;
+
+            string oldName = doc.GetElement(vp.GetTypeId())?.Name ?? "Unknown";
+            string newName = doc.GetElement(sourceTypeId)?.Name ?? "Unknown";
+
+            try
+            {
+                if (!vp.GetValidTypes().Contains(sourceTypeId))
+                {
+                    log.Add($"    ⚠ viewport type \"{newName}\" is not valid for this viewport; left as \"{oldName}\".");
+                    issues.Add($"{target.ComboLabel}: viewport type \"{newName}\" is not valid for this viewport");
+                    return;
+                }
+
+                ElementId changedId = vp.ChangeTypeId(sourceTypeId);
+                if (changedId != null && changedId != ElementId.InvalidElementId && changedId != vp.Id
+                    && doc.GetElement(changedId) is Viewport replaced)
+                {
+                    target.Viewport = replaced;
+                }
+
+                doc.Regenerate();
+                log.Add($"    Viewport type: \"{oldName}\" → \"{newName}\".");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"    ⚠ could not change viewport type to \"{newName}\": {ex.Message}");
+                issues.Add($"{target.ComboLabel}: could not change viewport type to \"{newName}\" — {ex.Message}");
+            }
+        }
+
+        // Sheet position of the left end of a viewport's title line: Viewport.LabelOffset
+        // is a 2D vector from the viewport's bottom-left corner to that point (only valid
+        // for an unrotated viewport). Returns null, with the reason, when unavailable.
+        private static XYZ GetTitleAnchor(Viewport vp, out string note)
+        {
+            note = null;
+            try
+            {
+                if (vp.Rotation != ViewportRotation.None)
+                {
+                    note = "the source viewport is rotated on its sheet";
+                    return null;
+                }
+
+                XYZ boxMin = vp.GetBoxOutline().MinimumPoint;
+                XYZ offset = vp.LabelOffset;
+                return new XYZ(boxMin.X + offset.X, boxMin.Y + offset.Y, 0);
+            }
+            catch (Exception ex)
+            {
+                note = $"the source title position could not be read ({ex.Message})";
+                return null;
+            }
+        }
+
+        // Moves the target's title so its line starts at the source's title position on the sheet.
+        private static void AlignTitle(Document doc, Viewport sourceVp, VM_PlanViewport target, XYZ sourceAnchor, List<string> log, List<string> issues)
+        {
+            try
+            {
+                Viewport vp = target.Viewport;
+                if (vp.Rotation != ViewportRotation.None)
+                {
+                    log.Add("    ⚠ title not aligned — the viewport is rotated on its sheet.");
+                    issues.Add($"{target.ComboLabel}: title not aligned — viewport is rotated on its sheet");
+                    return;
+                }
+
+                XYZ boxMin = vp.GetBoxOutline().MinimumPoint;
+                XYZ newOffset = new XYZ(sourceAnchor.X - boxMin.X, sourceAnchor.Y - boxMin.Y, 0);
+                XYZ oldOffset = vp.LabelOffset;
+
+                vp.LabelOffset = newOffset;
+                doc.Regenerate();
+
+                log.Add($"    Title moved by (X={(newOffset.X - oldOffset.X) * MmPerFt:F1} mm, Y={(newOffset.Y - oldOffset.Y) * MmPerFt:F1} mm) to match the source.");
+
+                // Informational only: label outlines also depend on title text, so a
+                // small difference here is expected when the view names differ.
+                XYZ sourceLabelMin = sourceVp.GetLabelOutline().MinimumPoint;
+                XYZ targetLabelMin = vp.GetLabelOutline().MinimumPoint;
+                log.Add($"    Title outline corner vs source: dX={(targetLabelMin.X - sourceLabelMin.X) * MmPerFt:F2} mm, dY={(targetLabelMin.Y - sourceLabelMin.Y) * MmPerFt:F2} mm");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"    ⚠ could not align the title: {ex.Message}");
+                issues.Add($"{target.ComboLabel}: could not align the title — {ex.Message}");
+            }
         }
 
         // ---------------- Off-sheet check ----------------

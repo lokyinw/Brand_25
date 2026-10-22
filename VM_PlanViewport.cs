@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace Brand_25
 {
@@ -14,7 +15,8 @@ namespace Brand_25
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         public ViewSheet Sheet { get; }
-        public Viewport Viewport { get; }
+        // Settable only so the command can swap in the new element if a type change replaces it.
+        public Viewport Viewport { get; internal set; }
         public View PlanView { get; }
 
         public string SheetNumber => Sheet.SheetNumber;
@@ -104,16 +106,33 @@ namespace Brand_25
     }
 
     // Groups a sheet's plan viewports under a non-selectable header row in the target tree.
-    public class VM_PlanSheetGroup
+    public class VM_PlanSheetGroup : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
         public ViewSheet Sheet { get; }
         public string HeaderText => $"{Sheet.SheetNumber} - {Sheet.Name}";
         public List<VM_PlanViewport> Plans { get; }
+
+        private bool _isExpanded = true;
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set
+            {
+                if (_isExpanded == value) return;
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
 
         public VM_PlanSheetGroup(ViewSheet sheet, List<VM_PlanViewport> plans)
         {
             Sheet = sheet;
             Plans = plans;
         }
+
+        // Collapses the sheet when none of its plans can be selected, expands it otherwise.
+        public void RefreshExpansion() => IsExpanded = Plans.Any(p => p.CanSelect);
     }
 }

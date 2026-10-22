@@ -73,8 +73,8 @@
             </Style.Triggers>
         </Style>
 
-        <Style TargetType="{x:Type TreeViewItem}">
-            <Setter Property="IsExpanded" Value="True"/>
+        <Style x:Key="SheetGroupItemStyle" TargetType="{x:Type TreeViewItem}">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
         </Style>
 
         <HierarchicalDataTemplate x:Key="PlanSheetGroupTemplate" ItemsSource="{Binding Plans}">
@@ -141,7 +141,8 @@
 
         <!-- Target tree -->
         <TreeView x:Name="TargetTree" Grid.Row="3" Margin="15 0 15 10" Background="#D8D8D8"
-                  ItemTemplate="{StaticResource PlanSheetGroupTemplate}"/>
+                  ItemTemplate="{StaticResource PlanSheetGroupTemplate}"
+                  ItemContainerStyle="{StaticResource SheetGroupItemStyle}"/>
 
         <!-- Buttons -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15 0 0 10">

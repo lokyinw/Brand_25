@@ -5,10 +5,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:app.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|c:\\users\\lokyinw\\source\\repos\\brand_25\\brand_25.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{5EB301F1-5DD0-E09F-0343-F953707305DA}|Brand_25.csproj|solutionrelative:brand_25.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
     }
   ],
   "DocumentGroupContainers": [
@@ -32,19 +28,6 @@
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-07-23T02:45:39.141Z",
               "IsPinned": true,
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Brand_25",
-              "DocumentMoniker": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
-              "RelativeDocumentMoniker": "Brand_25.csproj",
-              "ToolTip": "C:\\Users\\LokYinW\\source\\repos\\Brand_25\\Brand_25.csproj",
-              "RelativeToolTip": "Brand_25.csproj",
-              "ViewState": "AgIAACQAAAAAAAAAAAAAADsAAAAOAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-10-02T07:41:22.454Z",
               "EditorCaption": ""
             }
           ]
