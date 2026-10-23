@@ -35,6 +35,7 @@ namespace Brand_25
             public ViewSection View;
             public string OldName;
             public string NewName;
+            public string Source;   // which position located the room (for the log)
         }
 
         // Matches the trailing " - 3" of "101 Office - 3".
@@ -45,7 +46,7 @@ namespace Brand_25
             UIApplication uiApp = commandData.Application;
             UIDocument uiDoc = uiApp.ActiveUIDocument;
             Document doc = uiDoc.Document;
-            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.2";
+            string credit = "Last Modified by Lok on 2026-10-22. Beta 0.3";
 
             List<string> log = new List<string>
             {
@@ -74,6 +75,10 @@ namespace Brand_25
                     })
                     .Where(ri => ri.Box != null)
                     .ToList();
+                log.Add($"[Info] Rooms considered (placed, with a bounding box): {rooms.Count}");
+
+                int levelUnknown = 0;          // elevations matched on position alone
+                bool markerInfoLogged = false;
 
                 List<RenamePlan> plans = new List<RenamePlan>();
 
@@ -82,10 +87,12 @@ namespace Brand_25
                 Lazy<Dictionary<ElementId, List<ViewPlan>>> plansByMarker =
                     new Lazy<Dictionary<ElementId, List<ViewPlan>>>(() => BuildPlansByMarker(doc));
 
-                IEnumerable<ElevationMarker> markers = new FilteredElementCollector(doc)
+                List<ElevationMarker> markers = new FilteredElementCollector(doc)
                     .OfClass(typeof(ElevationMarker))
                     .Cast<ElevationMarker>()
-                    .Where(m => !m.IsReference);
+                    .Where(m => !m.IsReference)
+                    .ToList();
+                log.Add($"[Info] Elevation markers found: {markers.Count}");
 
                 foreach (ElevationMarker marker in markers)
                 {
@@ -127,30 +134,51 @@ namespace Brand_25
                         // If neither works the room is matched on position alone (see FindRoomAtPoint).
                         Level level = hostPlan?.GenLevel ?? FindLevelFromAssociatedLevel(doc, view);
 
-                        // Position: marker location, else the elevation view's origin, else the marker's
-                        // bounding box. Only X/Y are used - Z is matched against each room itself.
-                        XYZ point = GetMarkerPoint(marker, view, hostPlan, out string pointSource);
+                        if (!markerInfoLogged)
+                        {
+                            // What the API actually gives for a marker in this model, for the first one only.
+                            markerInfoLogged = true;
+                            log.Add($"[Info] First marker (Id {marker.Id.Value}): Location is " +
+                                    $"{(marker.Location == null ? "null" : marker.Location.GetType().Name)}, " +
+                                    $"owner view {(marker.OwnerViewId == ElementId.InvalidElementId ? "none" : "set")}, " +
+                                    $"host plan {(hostPlan != null ? "'" + hostPlan.Name + "'" : "not found")}, " +
+                                    $"level {(level != null ? "'" + level.Name + "'" : "not found")}");
+                        }
 
-                        if (point == null)
+                        // Candidate positions (X/Y only - Z is matched against each room itself), most
+                        // trustworthy first. The first one that lands in a room is used.
+                        List<(string source, XYZ point)> points = GetMarkerPoints(marker, view, hostPlan);
+
+                        if (points.Count == 0)
                         {
                             issueCount++;
-                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): cannot work out the marker's location " +
-                                    $"[{pointSource}; owner view: {(marker.OwnerViewId == ElementId.InvalidElementId ? "none" : "set")}; " +
-                                    $"host plan: {(hostPlan != null ? hostPlan.Name : "none")}] - not renamed");
+                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): cannot work out the marker's location - not renamed");
                             continue;
                         }
 
-                        if (level == null)
+                        if (level == null) levelUnknown++;
+
+                        Room room = null;
+                        string usedSource = null;
+                        List<string> attempts = new List<string>();
+                        foreach ((string source, XYZ point) in points)
                         {
-                            log.Add($"[Note] '{view.Name}' (Id {view.Id.Value}): level could not be determined; " +
-                                    $"room matched on position alone (location from {pointSource})");
+                            Room hit = FindRoomAtPoint(doc, rooms, point, level, phaseId, view,
+                                                       out string problem, out string diag);
+                            if (hit != null)
+                            {
+                                room = hit;
+                                usedSource = source;
+                                break;
+                            }
+                            attempts.Add($"{source} ({point.X:0.0}, {point.Y:0.0}) ft: {problem} [{diag}]");
                         }
 
-                        Room room = FindRoomAtPoint(doc, rooms, point, level, phaseId, view, out string problem);
                         if (room == null)
                         {
                             issueCount++;
-                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): {problem} - not renamed");
+                            log.Add($"[Issue] '{view.Name}' (Id {view.Id.Value}): no room found - " +
+                                    string.Join(" | ", attempts) + " - not renamed");
                             continue;
                         }
 
@@ -163,8 +191,14 @@ namespace Brand_25
                             continue;
                         }
 
-                        plans.Add(new RenamePlan { View = view, OldName = view.Name, NewName = newName });
+                        plans.Add(new RenamePlan { View = view, OldName = view.Name, NewName = newName, Source = usedSource });
                     }
+                }
+
+                if (levelUnknown > 0)
+                {
+                    log.Add($"[Note] The level could not be determined for {levelUnknown} elevations; " +
+                            "their rooms were matched on position alone.");
                 }
 
                 if (plans.Count > 0)
@@ -197,7 +231,7 @@ namespace Brand_25
                             {
                                 plan.View.Name = plan.NewName;
                                 renamed++;
-                                log.Add($"[Renamed] '{plan.OldName}' -> '{plan.NewName}'");
+                                log.Add($"[Renamed] '{plan.OldName}' -> '{plan.NewName}' (room found via {plan.Source})");
                             }
                             catch (Exception ex)
                             {
@@ -355,71 +389,95 @@ namespace Brand_25
                 .FirstOrDefault(l => l.Name == levelName);
         }
 
-        // The marker's position, trying in turn: the marker's own location point, the elevation
-        // view's origin, then the centre of the marker's bounding box in its host plan. Only
-        // X/Y of the result are used. 'source' says which one worked (or why none did).
-        private static XYZ GetMarkerPoint(ElevationMarker marker, ViewSection view, ViewPlan hostPlan, out string source)
+        // Candidate positions for the marker, most trustworthy first (only X/Y are used later):
+        //  1. the marker's own location point;
+        //  2. the centre of the marker's bounding box in its host plan (the symbol is a few
+        //     hundred mm across, so this stays well inside the room it was placed in);
+        //  3. the centre of the elevation's crop box, i.e. the middle of what it looks at;
+        //  4. the elevation view's origin (last, because it may sit on the view plane at a wall).
+        // A position only counts when it lands in a room, so an unusable one is just skipped.
+        private static List<(string source, XYZ point)> GetMarkerPoints(ElevationMarker marker, ViewSection view, ViewPlan hostPlan)
         {
+            List<(string source, XYZ point)> points = new List<(string source, XYZ point)>();
+
             if (marker.Location is LocationPoint lp)
+                points.Add(("marker location", lp.Point));
+
+            try
             {
-                source = "marker location";
-                return lp.Point;
+                BoundingBoxXYZ box = hostPlan != null ? marker.get_BoundingBox(hostPlan) : null;
+                if (box != null)
+                    points.Add(("marker bounding box", (box.Min + box.Max) * 0.5));
+            }
+            catch (Exception)
+            {
+                // not available for this marker - try the next source
+            }
+
+            try
+            {
+                BoundingBoxXYZ crop = view.CropBox;
+                if (crop != null && crop.Transform != null)
+                    points.Add(("crop box centre", crop.Transform.OfPoint((crop.Min + crop.Max) * 0.5)));
+            }
+            catch (Exception)
+            {
+                // not available for this view - try the next source
             }
 
             try
             {
                 XYZ origin = view.Origin;
                 if (origin != null)
-                {
-                    source = "elevation view origin";
-                    return origin;
-                }
+                    points.Add(("elevation view origin", origin));
             }
             catch (Exception)
             {
-                // fall through to the bounding box
+                // not available for this view
             }
 
-            BoundingBoxXYZ box = hostPlan != null ? marker.get_BoundingBox(hostPlan) : null;
-            if (box != null)
-            {
-                source = "marker bounding box";
-                return (box.Min + box.Max) * 0.5;
-            }
-
-            source = $"marker.Location is {(marker.Location == null ? "null" : marker.Location.GetType().Name)}, " +
-                     "view origin and bounding box unavailable";
-            return null;
+            return points;
         }
 
         // The room that contains the point, on the given level and phase. When the same spot
         // holds rooms from more than one design option, the ones in options the elevation does
         // not show are dropped, and an option room wins over a main-model room.
+        // 'diag' counts how many rooms survive each test (XY box, phase, level, point inside), so a
+        // failure in the log shows which test removed them.
         private static Room FindRoomAtPoint(Document doc, List<RoomInfo> rooms, XYZ point, Level level,
-                                            ElementId phaseId, View elevationView, out string problem)
+                                            ElementId phaseId, View elevationView,
+                                            out string problem, out string diag)
         {
             problem = null;
             const double tolerance = 0.01;   // feet
 
+            int xyHits = 0, phaseHits = 0, levelHits = 0;
             List<Room> found = new List<Room>();
             foreach (RoomInfo info in rooms)
             {
-                if (level != null && info.Room.LevelId != level.Id) continue;   // level unknown: position only
-                if (phaseId != ElementId.InvalidElementId && info.PhaseId != phaseId) continue;
-
                 BoundingBoxXYZ b = info.Box;
                 if (point.X < b.Min.X - tolerance || point.X > b.Max.X + tolerance ||
                     point.Y < b.Min.Y - tolerance || point.Y > b.Max.Y + tolerance) continue;
+                xyHits++;
 
-                // Tested at the room's own floor (+ a little) so the level/room datum
+                if (phaseId != ElementId.InvalidElementId && info.PhaseId != phaseId) continue;
+                phaseHits++;
+
+                if (level != null && info.Room.LevelId != level.Id) continue;   // level unknown: position only
+                levelHits++;
+
+                // Tested near the room's own floor, middle and ceiling, so the level/room datum
                 // difference in this project cannot put the point outside the room.
-                if (info.Room.IsPointInRoom(new XYZ(point.X, point.Y, b.Min.Z + 0.05)))
+                double[] zs = { b.Min.Z + 0.05, (b.Min.Z + b.Max.Z) * 0.5, b.Max.Z - 0.05 };
+                if (zs.Any(z => info.Room.IsPointInRoom(new XYZ(point.X, point.Y, z))))
                     found.Add(info.Room);
             }
 
+            diag = $"rooms: in XY box {xyHits}, in phase {phaseHits}, on level {levelHits}, containing point {found.Count}, of {rooms.Count}";
+
             if (found.Count == 0)
             {
-                problem = "no room found at the elevation marker's location";
+                problem = "no room at this position";
                 return null;
             }
 
