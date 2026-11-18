@@ -163,9 +163,13 @@ namespace Brand_25
             btnDatal2.ToolTip = "Create Mass families from Excel Area Schedule.";
             panelLuna.AddItem(btnDatal2);
 
+            RibbonPanel panelMaddy = application.CreateRibbonPanel(tabName, "Maddy");
+            PushButtonData btnDatam1 = new PushButtonData("btnm1", "Room From\nMass", Assembly.GetExecutingAssembly().Location, "Brand_25.Room_FromMass");
+            btnDatam1.LargeImage = LoadEmbeddedImage("Brand_25.Resources.Images.Placeholder_32.png"); // swap for a real icon
+            btnDatam1.ToolTip = "Create an unplaced Room for every Mass with a BA_Material_AreaGroup value, and copy the briefing parameters across.";
+            panelMaddy.AddItem(btnDatam1);
 
 
-            
 
             // CurrentButton can only be set while IsSynchronizedWithCurrentItem stays true
             // (Revit throws InvalidOperationException otherwise). Leaving it at its default
