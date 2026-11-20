@@ -10,7 +10,7 @@ using System.Linq;
 namespace Brand_25
 {
     // Creates one UNPLACED Room (phase "New Construction") for every Mass instance
-    // whose BA_Material_AreaGroup has a value, then copies six parameters across:
+    // whose BA_Material_AreaGroup has a value, then copies seven parameters across:
     //
     //   Mass                    ->  Room
     //   BA_Required Area        ->  BA_BriefedRoomArea
@@ -19,13 +19,14 @@ namespace Brand_25
     //   BA_SDT_PartNumber       ->  BA_SDT_PartNumber
     //   BA_Briefed Area Name    ->  Name            (blank -> "unnamed room")
     //   BA_TeachingSpace        ->  BA_TeachingSpace
+    //   BA_Area Group           ->  BA_Area Group
     //
     // Mass parameters (including family parameters such as BA_TeachingSpace) are looked
     // up on the instance first, then on the mass's type — see GetMassParam.
     //
     // Order of work (nothing in the model is touched until every check has passed):
     //   1. Collect masses with BA_Material_AreaGroup populated.
-    //   2. Per-mass check: any mass missing one of the six params is logged + skipped.
+    //   2. Per-mass check: any mass missing one of the seven params is logged + skipped.
     //   3. Category-level check on Room (via doc.ParameterBindings, so it also works when
     //      the model has no rooms yet). A param missing from Room but available as a
     //      project parameter is queued to be bound to Room; a param that exists nowhere
@@ -58,6 +59,7 @@ namespace Brand_25
             ("BA_SDT_PartNumber",    "BA_SDT_PartNumber"),
             ("BA_Briefed Area Name", RoomNameParam),
             ("BA_TeachingSpace",     "BA_TeachingSpace"),
+            ("BA_Area Group",        "BA_Area Group"),
         };
 
         private const string BriefedAreaNameMassParam = "BA_Briefed Area Name";
@@ -140,7 +142,7 @@ namespace Brand_25
                 return Result.Succeeded;
             }
 
-            // ── Step 2: per-mass check for the six source params ──────────────
+            // ── Step 2: per-mass check for the seven source params ──────────────
 
             List<Element> validMasses = new List<Element>();
             int skippedMasses = 0;
@@ -167,8 +169,8 @@ namespace Brand_25
 
             if (validMasses.Count == 0)
             {
-                log.Add("No mass has all six required parameters — nothing to create.");
-                return Abort("No Usable Masses", "None of the masses have all six required parameters.");
+                log.Add("No mass has all seven required parameters — nothing to create.");
+                return Abort("No Usable Masses", "None of the masses have all seven required parameters.");
             }
 
             // ── Step 3: does Room have each target param (or can it get it)? ──
