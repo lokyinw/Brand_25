@@ -13,7 +13,7 @@ namespace Brand_25
     // whose BA_Material_AreaGroup has a value, then copies six parameters across:
     //
     //   Mass                    ->  Room
-    //   BA_Required Area        ->  BA_BriefedArea
+    //   BA_Required Area        ->  BA_BriefedRoomArea
     //   BA_Space Type           ->  BA_Space Type
     //   BA_Space Subtype        ->  BA_Space Subtype
     //   BA_SDT_PartNumber       ->  BA_SDT_PartNumber
@@ -52,7 +52,7 @@ namespace Brand_25
         // Mass parameter -> Room parameter. Order is the order they're copied/logged in.
         private static readonly (string MassParam, string RoomParam)[] ParamMap =
         {
-            ("BA_Required Area",     "BA_BriefedArea"),
+            ("BA_Required Area",     "BA_BriefedRoomArea"),
             ("BA_Space Type",        "BA_Space Type"),
             ("BA_Space Subtype",     "BA_Space Subtype"),
             ("BA_SDT_PartNumber",    "BA_SDT_PartNumber"),
